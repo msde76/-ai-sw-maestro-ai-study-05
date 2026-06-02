@@ -1,0 +1,34 @@
+# =========================
+# 1. Spring Boot (Backend)
+# =========================
+.gradle
+/build/
+!gradle/wrapper/gradle-wrapper.jar
+out/
+/backend/build/
+/backend/bin/
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# =========================
+# 2. Python (AI / Frontend)
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.env/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# =========================
+# 3. Node / React (Frontend - JS 사용할 경우)
+# =========================
+node_modules/
+dist/
+.env
+.DS_Store
