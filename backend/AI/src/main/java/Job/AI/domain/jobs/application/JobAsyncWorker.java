@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -26,8 +27,16 @@ public class JobAsyncWorker {
     private final RestClient restClient;
 
     private static final String TASK_KEY_PREFIX = "job:task:";
+    private static final double MIN_SUITABILITY_SCORE = 0.7;
+    private static final int TASK_TTL_MINUTES = 10;
 
-    // application.yml에서 주소 값을 동적으로 주입받습니다.
+    private static final String COMPLETED_MESSAGE =
+            "사용자에게 적합한 채용공고 추천이 완료되었습니다. 지원 전 원문 링크에서 최신 상태를 확인하세요.";
+    private static final String EMPTY_MESSAGE =
+            "적합도 0.7 이상인 공고를 찾지 못했습니다. 희망 조건을 완화해 다시 시도해보세요.";
+    private static final String ERROR_MESSAGE =
+            "AI 서버와 통신하는 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.";
+
     @Value("${app.ai.server-url}")
     private String aiServerUrl;
 
@@ -42,56 +51,76 @@ public class JobAsyncWorker {
         String redisKey = TASK_KEY_PREFIX + taskId;
 
         try {
-            log.info("[Task {}] AI 서버({})에 추천 요청 전송 시작...", taskId, aiServerUrl);
+            log.info("[Task {}] AI server({}) recommendation request started.", taskId, aiServerUrl);
 
-            // 1. 하드코딩된 주소 대신 주입받은 aiServerUrl 변수를 사용합니다.
             List<JobResponseDTO.JobDataDTO> resultData = restClient.post()
                     .uri(aiServerUrl)
                     .body(taskInfo)
                     .retrieve()
                     .body(new ParameterizedTypeReference<List<JobResponseDTO.JobDataDTO>>() {});
 
-            log.info("[Task {}] AI 서버 응답 수신 완료. 추출된 추천 공고 수: {}", taskId, resultData != null ? resultData.size() : 0);
+            List<JobResponseDTO.JobDataDTO> normalizedData = normalizeRecommendations(resultData);
+            log.info(
+                    "[Task {}] AI server response received. raw={}, normalized={}",
+                    taskId,
+                    resultData != null ? resultData.size() : 0,
+                    normalizedData.size()
+            );
 
-            // 2. 상태 처리 로직
-            JobResponseDTO.TaskStatusDTO completedStatus;
-            if (resultData == null || resultData.isEmpty()) {
-                completedStatus = JobConverter.toTaskStatusDTO(
-                        "EMPTY",
-                        "적합도 0.7 이상의 공고를 찾지 못했습니다. 조건을 완화해 보세요.",
-                        List.of()
-                );
-            } else {
-                completedStatus = JobConverter.toTaskStatusDTO(
-                        "COMPLETED",
-                        "사용자 맞춤형 채용공고 추천이 완료되었습니다.",
-                        resultData
-                );
-            }
+            JobResponseDTO.TaskStatusDTO completedStatus = createCompletionStatus(normalizedData);
 
-            // 3. Redis 최종 업데이트
-            redisTemplate.opsForValue().set(redisKey, objectMapper.writeValueAsString(completedStatus), 10, TimeUnit.MINUTES);
-            log.info("[Task {}] 추천 완료! Redis 업데이트 성공.", taskId);
+            redisTemplate.opsForValue().set(
+                    redisKey,
+                    objectMapper.writeValueAsString(completedStatus),
+                    TASK_TTL_MINUTES,
+                    TimeUnit.MINUTES
+            );
+            log.info("[Task {}] Recommendation finished. Redis status updated.", taskId);
 
         } catch (RestClientException e) {
-            log.error("[Task {}] AI 서버 통신 중 에러 발생: {}", taskId, e.getMessage());
+            log.error("[Task {}] AI server communication failed: {}", taskId, e.getMessage());
             saveErrorStatusToRedis(redisKey);
         } catch (Exception e) {
-            log.error("[Task {}] AI 추천 처리 중 알 수 없는 에러 발생: {}", taskId, e.getMessage());
+            log.error("[Task {}] Unexpected recommendation error: {}", taskId, e.getMessage());
             saveErrorStatusToRedis(redisKey);
         }
+    }
+
+    private List<JobResponseDTO.JobDataDTO> normalizeRecommendations(List<JobResponseDTO.JobDataDTO> resultData) {
+        if (resultData == null || resultData.isEmpty()) {
+            return List.of();
+        }
+
+        return resultData.stream()
+                .filter(jobData -> jobData != null && jobData.getSuitabilityScore() != null)
+                .filter(jobData -> jobData.getSuitabilityScore() >= MIN_SUITABILITY_SCORE)
+                .sorted(Comparator.comparing(JobResponseDTO.JobDataDTO::getSuitabilityScore).reversed())
+                .toList();
+    }
+
+    private JobResponseDTO.TaskStatusDTO createCompletionStatus(List<JobResponseDTO.JobDataDTO> normalizedData) {
+        if (normalizedData == null || normalizedData.isEmpty()) {
+            return JobConverter.toTaskStatusDTO("EMPTY", EMPTY_MESSAGE, List.of());
+        }
+
+        return JobConverter.toTaskStatusDTO("COMPLETED", COMPLETED_MESSAGE, normalizedData);
     }
 
     private void saveErrorStatusToRedis(String redisKey) {
         JobResponseDTO.TaskStatusDTO errorStatus = JobConverter.toTaskStatusDTO(
                 "ERROR",
-                "AI 서버와 통신하는 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.",
+                ERROR_MESSAGE,
                 null
         );
         try {
-            redisTemplate.opsForValue().set(redisKey, objectMapper.writeValueAsString(errorStatus), 10, TimeUnit.MINUTES);
+            redisTemplate.opsForValue().set(
+                    redisKey,
+                    objectMapper.writeValueAsString(errorStatus),
+                    TASK_TTL_MINUTES,
+                    TimeUnit.MINUTES
+            );
         } catch (JsonProcessingException ex) {
-            log.error("Redis 에러 상태 저장 실패", ex);
+            log.error("Failed to save Redis error status.", ex);
         }
     }
 }
