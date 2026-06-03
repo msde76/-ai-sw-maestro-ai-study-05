@@ -1,8 +1,8 @@
 import json
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
-from pydantic import BaseModel, ConfigDict, StrictBool
+from pydantic import BaseModel, ConfigDict, StrictBool, field_validator
 
 from app.graph.state import GraphState
 
@@ -25,6 +25,30 @@ class UserProfile(BaseModel):
     jobDirection: str
     missingInformation: list[str]
     isSufficient: StrictBool
+
+    @field_validator(
+        "projectExperiences",
+        "technicalSkills",
+        "roleSignals",
+        "strengths",
+        "missingInformation",
+        mode="before",
+    )
+    @classmethod
+    def normalize_text_items(cls, value: Any) -> list[str]:
+        if not isinstance(value, list):
+            raise ValueError("Expected a list")
+        normalized = [_text_item(item) for item in value]
+        return [item for item in normalized if item]
+
+
+def _text_item(item: Any) -> str:
+    if isinstance(item, str):
+        return item.strip()
+    if isinstance(item, dict):
+        parts = [str(value).strip() for value in item.values() if value not in (None, "")]
+        return " / ".join(part for part in parts if part)
+    raise ValueError("Expected a string or object item")
 
 
 async def analyze_user(state: GraphState, llm: JsonLLM) -> GraphState:

@@ -1,4 +1,5 @@
 import json
+import re
 from typing import Any
 
 from mcp import ClientSession
@@ -37,12 +38,60 @@ def _content_to_dict(result: Any) -> dict[str, Any]:
             try:
                 payload = json.loads(text)
             except json.JSONDecodeError as exc:
+                parsed_jobs = _parse_search_jobs_text(text)
+                if parsed_jobs is not None:
+                    return {"items": parsed_jobs}
                 raise PathsdogMCPError("Invalid JSON returned by Pathsdog MCP tool") from exc
             if isinstance(payload, dict):
                 return payload
             return {"items": payload}
 
     return {}
+
+
+def _parse_search_jobs_text(text: str) -> list[dict[str, Any]] | None:
+    if "검색 결과가 없습니다" in text:
+        return []
+    if "[ID:" not in text:
+        return None
+
+    jobs: list[dict[str, Any]] = []
+    blocks = re.split(r"\n(?=\[ID:)", text)
+    for block in blocks:
+        header_match = re.search(r"\[ID:(?P<id>\d+)\]\s*(?P<company>.+?)\s*-\s*(?P<title>.+)", block)
+        if not header_match:
+            continue
+
+        job = {
+            "jobId": header_match.group("id"),
+            "companyName": header_match.group("company").strip(),
+            "jobTitle": header_match.group("title").strip(),
+            "sourceSnapshot": block.strip(),
+        }
+
+        tech_match = re.search(r"기술:\s*(?P<skills>.+)", block)
+        if tech_match:
+            job["skills"] = [skill.strip() for skill in tech_match.group("skills").split(",") if skill.strip()]
+
+        experience_match = re.search(r"경력:\s*(?P<experience>.+?)(?:\s*\|\s*근무지:|\n)", block, re.DOTALL)
+        if experience_match:
+            job["experience"] = " ".join(experience_match.group("experience").split())
+
+        location_match = re.search(r"근무지:\s*(?P<location>.+?)(?:\s*\||\n)", block, re.DOTALL)
+        if location_match:
+            job["location"] = " ".join(location_match.group("location").split())
+
+        deadline_match = re.search(r"(마감:\s*(?P<deadline>.+)|(?P<always>상시채용))", block)
+        if deadline_match:
+            job["deadline"] = (deadline_match.group("deadline") or deadline_match.group("always") or "").strip()
+
+        link_match = re.search(r"링크:\s*(?P<link>\S+)", block)
+        if link_match:
+            job["originalLink"] = link_match.group("link").strip()
+
+        jobs.append(job)
+
+    return jobs
 
 
 def _extract_payload_from_result(result: Any) -> dict[str, Any]:

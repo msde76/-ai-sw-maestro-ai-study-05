@@ -80,6 +80,36 @@ async def test_analyze_user_rejects_string_bool_sufficiency():
         await analyze_user({"request": request}, FakeLLM(response))
 
 
+@pytest.mark.asyncio
+async def test_analyze_user_normalizes_object_experience_items():
+    response = {
+        "projectExperiences": [
+            {
+                "title": "USG AI 데이터 문제해결 제조 혁신 경진 대회",
+                "summary": "LED 숫자 이미지 분류와 모델 재현성 관리",
+            }
+        ],
+        "technicalSkills": ["CNN", {"tool": "k-cross validation"}],
+        "roleSignals": ["제조 DX"],
+        "strengths": [{"name": "실험 관리", "evidence": "모델명에 하이퍼파라미터와 성능 저장"}],
+        "jobDirection": "제조 DX 데이터 엔지니어",
+        "missingInformation": [],
+        "isSufficient": True,
+    }
+    request = AnalyzeRequest(
+        coverLetter="제조 데이터 경진대회에서 CNN 모델 실험을 관리했습니다.",
+        preferences=Preferences(jobRole="제조 DX 데이터 엔지니어", techStack=["CNN"], region="포항"),
+    )
+
+    result = await analyze_user({"request": request}, FakeLLM(response))
+
+    assert result["user_profile"]["projectExperiences"] == [
+        "USG AI 데이터 문제해결 제조 혁신 경진 대회 / LED 숫자 이미지 분류와 모델 재현성 관리"
+    ]
+    assert result["user_profile"]["technicalSkills"] == ["CNN", "k-cross validation"]
+    assert result["user_profile"]["strengths"] == ["실험 관리 / 모델명에 하이퍼파라미터와 성능 저장"]
+
+
 def test_route_by_completeness_continues_when_sufficient():
     state = {"user_profile": {"isSufficient": True}}
 
