@@ -53,6 +53,32 @@ class FakeSearchClient:
         ]
 
 
+class InsufficientInfoLLM:
+    def __init__(self):
+        self.calls = 0
+
+    async def complete_json(self, messages):
+        self.calls += 1
+        return {
+            "projectExperiences": [],
+            "technicalSkills": [],
+            "roleSignals": [],
+            "strengths": [],
+            "jobDirection": "",
+            "missingInformation": ["프로젝트 경험"],
+            "isSufficient": False,
+        }
+
+
+class TrackingSearchClient:
+    def __init__(self):
+        self.calls = 0
+
+    async def search_jobs(self, query):
+        self.calls += 1
+        return []
+
+
 @pytest.mark.asyncio
 async def test_workflow_returns_scored_jobs():
     request = AnalyzeRequest(
@@ -66,3 +92,27 @@ async def test_workflow_returns_scored_jobs():
     assert len(jobs) == 1
     assert jobs[0].jobId == "1"
     assert jobs[0].suitabilityScore == 0.8
+
+
+@pytest.mark.asyncio
+async def test_workflow_returns_empty_without_search_when_profile_is_insufficient():
+    request = AnalyzeRequest(
+        coverLetter="프로젝트 경험을 더 정리해야 합니다.",
+        preferences=Preferences(
+            jobRole="백엔드 개발자",
+            experienceLevel="신입",
+            techStack=["Spring", "Redis"],
+            region="서울",
+            onlyWithReward=False,
+            isUrgent=False,
+        ),
+    )
+    llm = InsufficientInfoLLM()
+    search_client = TrackingSearchClient()
+    workflow = build_workflow(llm, search_client)
+
+    jobs = await run_workflow(workflow, request)
+
+    assert jobs == []
+    assert llm.calls == 1
+    assert search_client.calls == 0

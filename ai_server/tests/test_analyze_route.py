@@ -1,17 +1,11 @@
 from fastapi.testclient import TestClient
 
+from app.integrations.pathsdog_mcp import PathsdogMCPError
 from main import app
 
 
-def test_analyze_accepts_spring_payload_and_returns_list(monkeypatch):
-    async def fake_run_workflow(workflow, request):
-        return []
-
-    monkeypatch.setenv("UPSTAGE_API_KEY", "test-key")
-    monkeypatch.setattr("app.api.routes.build_workflow", lambda llm, search_client: object())
-    monkeypatch.setattr("app.api.routes.run_workflow", fake_run_workflow)
-    client = TestClient(app)
-    payload = {
+def _valid_payload():
+    return {
         "coverLetter": "Spring Boot 프로젝트에서 예약 API와 Redis 캐시를 구현했습니다.",
         "preferences": {
             "jobRole": "백엔드 개발자",
@@ -23,7 +17,16 @@ def test_analyze_accepts_spring_payload_and_returns_list(monkeypatch):
         },
     }
 
-    response = client.post("/ai/analyze", json=payload)
+
+def test_analyze_accepts_spring_payload_and_returns_list(monkeypatch):
+    async def fake_run_workflow(workflow, request):
+        return []
+
+    monkeypatch.setattr("app.api.routes.create_workflow", lambda: object())
+    monkeypatch.setattr("app.api.routes.run_workflow", fake_run_workflow)
+    client = TestClient(app)
+
+    response = client.post("/ai/analyze", json=_valid_payload())
 
     assert response.status_code == 200
     assert response.json() == []
@@ -45,3 +48,45 @@ def test_analyze_rejects_missing_cover_letter():
     response = client.post("/ai/analyze", json=payload)
 
     assert response.status_code == 422
+
+
+def test_analyze_returns_bad_gateway_for_value_error(monkeypatch):
+    async def fake_run_workflow(workflow, request):
+        raise ValueError("bad llm")
+
+    monkeypatch.setattr("app.api.routes.create_workflow", lambda: object())
+    monkeypatch.setattr("app.api.routes.run_workflow", fake_run_workflow)
+    client = TestClient(app)
+
+    response = client.post("/ai/analyze", json=_valid_payload())
+
+    assert response.status_code == 502
+    assert response.json() == {"detail": "bad llm"}
+
+
+def test_analyze_returns_bad_gateway_for_pathsdog_mcp_error(monkeypatch):
+    async def fake_run_workflow(workflow, request):
+        raise PathsdogMCPError("mcp failed")
+
+    monkeypatch.setattr("app.api.routes.create_workflow", lambda: object())
+    monkeypatch.setattr("app.api.routes.run_workflow", fake_run_workflow)
+    client = TestClient(app)
+
+    response = client.post("/ai/analyze", json=_valid_payload())
+
+    assert response.status_code == 502
+    assert response.json() == {"detail": "mcp failed"}
+
+
+def test_analyze_returns_generic_bad_gateway_for_unexpected_error(monkeypatch):
+    async def fake_run_workflow(workflow, request):
+        raise RuntimeError("unexpected")
+
+    monkeypatch.setattr("app.api.routes.create_workflow", lambda: object())
+    monkeypatch.setattr("app.api.routes.run_workflow", fake_run_workflow)
+    client = TestClient(app)
+
+    response = client.post("/ai/analyze", json=_valid_payload())
+
+    assert response.status_code == 502
+    assert response.json() == {"detail": "AI workflow failed"}
