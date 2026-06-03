@@ -45,6 +45,38 @@ def test_build_query_maps_generic_role_to_skills_not_query():
     assert "region" not in result["search_query"]
 
 
+def test_build_query_limits_large_tech_stack_for_broad_mcp_search():
+    request = AnalyzeRequest(
+        coverLetter="Java Spring Boot 백엔드 프로젝트",
+        preferences=Preferences(
+            jobRole="백엔드 개발자",
+            experienceLevel="신입",
+            techStack=[
+                "Java",
+                "Spring",
+                "Spring Boot",
+                "JPA",
+                "MySQL",
+                "SQL",
+                "Redis",
+                "Docker",
+                "AWS",
+                "Nginx",
+                "REST API",
+                "JWT",
+                "GitHub",
+            ],
+            region="서울, 경기, 판교",
+        ),
+    )
+
+    result = build_query({"request": request, "user_profile": {}})
+
+    assert result["search_query"]["skills"] == ["Java", "Spring Boot", "Backend"]
+    assert result["search_query"]["experience_filter"] == "신입"
+    assert "region" not in result["search_query"]
+
+
 def test_build_query_uses_preferences_before_conflicting_profile():
     request = AnalyzeRequest(
         coverLetter="React 프로젝트와 Spring 프로젝트를 모두 경험했습니다.",

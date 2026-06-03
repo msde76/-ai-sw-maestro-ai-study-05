@@ -4,6 +4,24 @@ from collections.abc import Iterable
 from app.graph.state import GraphState
 
 
+MAX_BASE_SEARCH_SKILLS = 2
+
+SEARCH_SKILL_PRIORITY = [
+    "Python",
+    "LLM",
+    "Java",
+    "Spring Boot",
+    "Spring",
+    "JPA",
+    "Kotlin",
+    "Node.js",
+    "TypeScript",
+    "React",
+    "SQL",
+    "AWS",
+    "Docker",
+]
+
 ROLE_SKILL_RULES: tuple[tuple[tuple[str, ...], str], ...] = (
     (("백엔드", "서버", "backend", "server"), "Backend"),
     (("프론트엔드", "프론트", "frontend", "front"), "Frontend"),
@@ -65,11 +83,28 @@ def _role_texts(preferred_role: str, profile: dict) -> list[str]:
 
 
 def _skills_with_role_tokens(base_skills: Iterable[str], role_texts: list[str]) -> list[str]:
-    skills = _unique_texts(base_skills)
+    skills = _search_base_skills(base_skills)
     for role_skill in _role_skills(role_texts):
         if not _contains_case_insensitive(skills, role_skill):
             skills.append(role_skill)
     return skills
+
+
+def _search_base_skills(base_skills: Iterable[str]) -> list[str]:
+    skills = _unique_texts(base_skills)
+    if len(skills) <= 3:
+        return skills
+
+    selected: list[str] = []
+    for priority_skill in SEARCH_SKILL_PRIORITY:
+        for skill in skills:
+            if skill.lower() == priority_skill.lower() and not _contains_case_insensitive(selected, skill):
+                selected.append(skill)
+                break
+        if len(selected) >= MAX_BASE_SEARCH_SKILLS:
+            return selected
+
+    return skills[:MAX_BASE_SEARCH_SKILLS]
 
 
 def _role_skills(role_texts: list[str]) -> list[str]:
