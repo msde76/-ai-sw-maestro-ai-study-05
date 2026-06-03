@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 from app.api.schemas import AnalyzeRequest, Preferences
@@ -6,8 +8,9 @@ from app.graph.nodes.check_completeness import route_by_completeness
 
 
 class FakeLLM:
-    async def complete_json(self, messages):
-        return {
+    def __init__(self, response=None):
+        self.messages = None
+        self.response = response or {
             "projectExperiences": ["예약 API 개발"],
             "technicalSkills": ["Spring", "Redis"],
             "roleSignals": ["백엔드 개발자"],
@@ -16,6 +19,10 @@ class FakeLLM:
             "missingInformation": [],
             "isSufficient": True,
         }
+
+    async def complete_json(self, messages):
+        self.messages = messages
+        return self.response
 
 
 @pytest.mark.asyncio
@@ -26,10 +33,51 @@ async def test_analyze_user_extracts_profile():
     )
     state = {"request": request}
 
-    result = await analyze_user(state, FakeLLM())
+    llm = FakeLLM()
+    result = await analyze_user(state, llm)
 
     assert result["user_profile"]["technicalSkills"] == ["Spring", "Redis"]
     assert result["user_profile"]["isSufficient"] is True
+
+
+@pytest.mark.asyncio
+async def test_analyze_user_sends_valid_json_with_korean_text():
+    request = AnalyzeRequest(
+        coverLetter="Spring Boot 예약 API를 만들고 Redis 캐시로 성능을 개선했습니다.",
+        preferences=Preferences(jobRole="백엔드 개발자", techStack=["Spring", "Redis"], region="서울"),
+    )
+    llm = FakeLLM()
+
+    await analyze_user({"request": request}, llm)
+
+    user_message = llm.messages[1]["content"]
+    label, json_payload = user_message.split("\n", 1)
+    parsed_payload = json.loads(json_payload)
+
+    assert label == "Analyze this JSON input:"
+    assert parsed_payload["coverLetter"] == "Spring Boot 예약 API를 만들고 Redis 캐시로 성능을 개선했습니다."
+    assert parsed_payload["preferences"]["jobRole"] == "백엔드 개발자"
+    assert "'coverLetter'" not in user_message
+
+
+@pytest.mark.asyncio
+async def test_analyze_user_rejects_string_bool_sufficiency():
+    response = {
+        "projectExperiences": ["예약 API 개발"],
+        "technicalSkills": ["Spring", "Redis"],
+        "roleSignals": ["백엔드 개발자"],
+        "strengths": ["API 성능 개선"],
+        "jobDirection": "백엔드 개발자",
+        "missingInformation": [],
+        "isSufficient": "true",
+    }
+    request = AnalyzeRequest(
+        coverLetter="Spring Boot 예약 API를 만들고 Redis 캐시로 성능을 개선했습니다.",
+        preferences=Preferences(jobRole="백엔드 개발자", techStack=["Spring", "Redis"], region="서울"),
+    )
+
+    with pytest.raises(ValueError):
+        await analyze_user({"request": request}, FakeLLM(response))
 
 
 def test_route_by_completeness_continues_when_sufficient():
