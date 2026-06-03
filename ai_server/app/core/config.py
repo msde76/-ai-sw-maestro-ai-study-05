@@ -1,9 +1,14 @@
+from pathlib import Path
+
 from pydantic import AnyHttpUrl, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+AI_SERVER_DIR = Path(__file__).resolve().parents[2]
+
+
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(env_file=AI_SERVER_DIR / ".env", env_file_encoding="utf-8", extra="ignore")
 
     upstage_api_key: str = Field(alias="UPSTAGE_API_KEY")
     upstage_base_url: AnyHttpUrl = Field(default="https://api.upstage.ai/v1", alias="UPSTAGE_BASE_URL")
