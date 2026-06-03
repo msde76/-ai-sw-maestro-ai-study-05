@@ -8,7 +8,7 @@ class FakeLLM:
     def __init__(self):
         self.calls = 0
 
-    async def complete_json(self, messages):
+    async def complete_json(self, messages, *, json_schema=None):
         self.calls += 1
         if self.calls == 1:
             return {
@@ -57,7 +57,7 @@ class InsufficientInfoLLM:
     def __init__(self):
         self.calls = 0
 
-    async def complete_json(self, messages):
+    async def complete_json(self, messages, *, json_schema=None):
         self.calls += 1
         return {
             "projectExperiences": [],

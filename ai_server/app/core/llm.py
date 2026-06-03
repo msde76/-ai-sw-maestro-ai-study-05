@@ -58,12 +58,24 @@ class UpstageLLM:
             base_url=str(settings.upstage_base_url),
         )
 
-    async def complete_json(self, messages: Sequence[dict[str, str]]) -> dict[str, Any]:
-        response = await self._client.chat.completions.create(
-            model=self._model,
-            messages=list(messages),
-            temperature=0.2,
-        )
+    async def complete_json(
+        self,
+        messages: Sequence[dict[str, str]],
+        *,
+        json_schema: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        request: dict[str, Any] = {
+            "model": self._model,
+            "messages": list(messages),
+            "temperature": 0.2,
+        }
+        if json_schema is not None:
+            request["response_format"] = {
+                "type": "json_schema",
+                "json_schema": json_schema,
+            }
+
+        response = await self._client.chat.completions.create(**request)
         content = response.choices[0].message.content
         if not content or not content.strip():
             raise ValueError("Missing response content")

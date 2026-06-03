@@ -6,12 +6,64 @@ from app.graph.state import GraphState
 
 
 class JsonLLM(Protocol):
-    async def complete_json(self, messages: list[dict[str, str]]) -> dict:
+    async def complete_json(self, messages: list[dict[str, str]], *, json_schema: dict | None = None) -> dict:
         ...
 
 
 PROMPT_PATH = Path(__file__).resolve().parents[2] / "prompts" / "suitability_scoring.md"
 JOB_LIST_KEYS = ("jobs", "recommendations", "results", "items", "scoredJobs", "topMatches")
+SCORING_RESPONSE_SCHEMA = {
+    "name": "job_scoring_response",
+    "strict": True,
+    "schema": {
+        "type": "object",
+        "properties": {
+            "jobs": {
+                "type": "array",
+                "maxItems": 5,
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "jobId": {"type": "string"},
+                        "companyName": {"type": "string"},
+                        "jobTitle": {"type": "string"},
+                        "suitabilityScore": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1,
+                        },
+                        "compensation": {"type": "string"},
+                        "deadline": {"type": "string"},
+                        "originalLink": {"type": "string"},
+                        "analysis": {
+                            "type": "object",
+                            "properties": {
+                                "matchReason": {"type": "string"},
+                                "missingPoints": {"type": "string"},
+                                "checkpointGuide": {"type": "string"},
+                            },
+                            "required": ["matchReason", "missingPoints", "checkpointGuide"],
+                            "additionalProperties": False,
+                        },
+                    },
+                    "required": [
+                        "jobId",
+                        "companyName",
+                        "jobTitle",
+                        "suitabilityScore",
+                        "compensation",
+                        "deadline",
+                        "originalLink",
+                        "analysis",
+                    ],
+                    "additionalProperties": False,
+                },
+            },
+        },
+        "required": ["jobs"],
+        "additionalProperties": False,
+    },
+}
 
 
 def _validate_scoring_response(response: dict) -> list[dict]:
@@ -63,6 +115,7 @@ async def score_jobs(state: GraphState, llm: JsonLLM) -> GraphState:
                     f"Score these jobs:\n{json.dumps(payload, ensure_ascii=False)}"
                 ),
             },
-        ]
+        ],
+        json_schema=SCORING_RESPONSE_SCHEMA,
     )
     return {"scored_jobs": _validate_scoring_response(response)}

@@ -74,3 +74,37 @@ async def test_complete_json_raises_value_error_for_empty_model_content():
 
     with pytest.raises(ValueError, match="content"):
         await llm.complete_json([{"role": "user", "content": "Return JSON"}])
+
+
+@pytest.mark.asyncio
+async def test_complete_json_passes_json_schema_response_format():
+    class FakeCompletions:
+        def __init__(self):
+            self.kwargs = None
+
+        async def create(self, **kwargs):
+            self.kwargs = kwargs
+            return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content='{"ok": true}'))])
+
+    completions = FakeCompletions()
+    llm = UpstageLLM.__new__(UpstageLLM)
+    llm._model = "test-model"
+    llm._client = SimpleNamespace(chat=SimpleNamespace(completions=completions))
+    json_schema = {
+        "name": "test_schema",
+        "schema": {
+            "type": "object",
+            "properties": {"ok": {"type": "boolean"}},
+            "required": ["ok"],
+            "additionalProperties": False,
+        },
+        "strict": True,
+    }
+
+    result = await llm.complete_json([{"role": "user", "content": "Return JSON"}], json_schema=json_schema)
+
+    assert result == {"ok": True}
+    assert completions.kwargs["response_format"] == {
+        "type": "json_schema",
+        "json_schema": json_schema,
+    }

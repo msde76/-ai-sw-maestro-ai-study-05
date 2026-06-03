@@ -9,10 +9,12 @@ class FakeScoringLLM:
         self.response = response
         self.calls = 0
         self.messages = None
+        self.json_schema = None
 
-    async def complete_json(self, messages):
+    async def complete_json(self, messages, *, json_schema=None):
         self.calls += 1
         self.messages = messages
+        self.json_schema = json_schema
         return self.response or {
             "jobs": [
                 {
@@ -72,6 +74,22 @@ async def test_score_jobs_prompt_requests_all_candidates_and_top_five():
     assert "최대 5개" in user_message
     assert "적합도가 낮아도" in user_message
     assert "jobs 배열" in user_message
+
+
+@pytest.mark.asyncio
+async def test_score_jobs_requests_structured_output_schema():
+    llm = FakeScoringLLM()
+
+    await score_jobs({"user_profile": {}, "candidate_jobs": [{"jobId": "1"}]}, llm)
+
+    assert llm.json_schema["name"] == "job_scoring_response"
+    assert llm.json_schema["strict"] is True
+    schema = llm.json_schema["schema"]
+    assert schema["required"] == ["jobs"]
+    assert schema["properties"]["jobs"]["maxItems"] == 5
+    job_schema = schema["properties"]["jobs"]["items"]
+    assert "jobId" in job_schema["required"]
+    assert "suitabilityScore" in job_schema["required"]
 
 
 @pytest.mark.asyncio
