@@ -1,9 +1,18 @@
+from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator
+
 from fastapi import FastAPI
 
-from app.api.routes import router as api_router
+from app.api.routes import create_workflow, router as api_router
 
 
-app = FastAPI(title="Job Recommendation AI Server")
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    app.state.workflow = create_workflow()
+    yield
+
+
+app = FastAPI(title="Job Recommendation AI Server", lifespan=lifespan)
 app.include_router(api_router)
 
 

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
 from app.api.schemas import AnalyzeRequest, JobData
 from app.core.config import Settings
@@ -18,10 +18,9 @@ def create_workflow():
 
 
 @router.post("/ai/analyze", response_model=list[JobData])
-async def analyze_jobs(request: AnalyzeRequest) -> list[JobData]:
+async def analyze_jobs(request: Request, payload: AnalyzeRequest) -> list[JobData]:
     try:
-        workflow = create_workflow()
-        return await run_workflow(workflow, request)
+        return await run_workflow(request.app.state.workflow, payload)
     except ValueError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     except PathsdogMCPError as exc:
