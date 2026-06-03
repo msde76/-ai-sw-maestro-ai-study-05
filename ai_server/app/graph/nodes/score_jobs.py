@@ -15,6 +15,8 @@ PROMPT_PATH = Path(__file__).resolve().parents[2] / "prompts" / "suitability_sco
 
 def _validate_scoring_response(response: dict) -> list[dict]:
     jobs = response.get("jobs") if isinstance(response, dict) else None
+    if jobs is None and isinstance(response, dict) and "jobId" in response:
+        return [response]
     if not isinstance(jobs, list):
         raise ValueError("LLM scoring response must include a jobs list")
     if not all(isinstance(job, dict) for job in jobs):

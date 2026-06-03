@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from typing import Any, Protocol
 
-from pydantic import BaseModel, ConfigDict, StrictBool, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator
 
 from app.graph.state import GraphState
 
@@ -22,9 +22,9 @@ class UserProfile(BaseModel):
     technicalSkills: list[str]
     roleSignals: list[str]
     strengths: list[str]
-    jobDirection: str
-    missingInformation: list[str]
-    isSufficient: StrictBool
+    jobDirection: str = ""
+    missingInformation: list[str] = Field(default_factory=list)
+    isSufficient: StrictBool = True
 
     @field_validator(
         "projectExperiences",

@@ -69,6 +69,24 @@ async def test_score_jobs_returns_empty_without_llm_call_when_candidate_jobs_emp
 
 
 @pytest.mark.asyncio
+async def test_score_jobs_accepts_single_top_level_job_payload():
+    llm = FakeScoringLLM(
+        response={
+            "jobId": "1",
+            "companyName": "A",
+            "jobTitle": "LLM 모델 데이터 관리",
+            "suitabilityScore": 0.85,
+            "analysis": {},
+        }
+    )
+
+    result = await score_jobs({"candidate_jobs": [{"jobId": "1"}]}, llm)
+
+    assert len(result["scored_jobs"]) == 1
+    assert result["scored_jobs"][0]["jobId"] == "1"
+
+
+@pytest.mark.asyncio
 async def test_score_jobs_raises_value_error_for_non_list_jobs_payload():
     llm = FakeScoringLLM(response={"jobs": {"jobId": "1"}})
 

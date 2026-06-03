@@ -110,6 +110,26 @@ async def test_analyze_user_normalizes_object_experience_items():
     assert result["user_profile"]["strengths"] == ["실험 관리 / 모델명에 하이퍼파라미터와 성능 저장"]
 
 
+@pytest.mark.asyncio
+async def test_analyze_user_defaults_optional_planning_fields_when_llm_omits_them():
+    response = {
+        "projectExperiences": ["제조 데이터 분류 프로젝트"],
+        "technicalSkills": ["Python", "CNN"],
+        "roleSignals": ["제조 DX"],
+        "strengths": ["실험 관리"],
+    }
+    request = AnalyzeRequest(
+        coverLetter="제조 데이터 경진대회에서 CNN 모델 실험을 관리했습니다.",
+        preferences=Preferences(jobRole="제조 DX 데이터 엔지니어", techStack=["CNN"], region="포항"),
+    )
+
+    result = await analyze_user({"request": request}, FakeLLM(response))
+
+    assert result["user_profile"]["jobDirection"] == ""
+    assert result["user_profile"]["missingInformation"] == []
+    assert result["user_profile"]["isSufficient"] is True
+
+
 def test_route_by_completeness_continues_when_sufficient():
     state = {"user_profile": {"isSufficient": True}}
 
