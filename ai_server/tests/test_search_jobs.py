@@ -15,61 +15,101 @@ from app.integrations.pathsdog_mcp import (
 )
 
 
-def test_build_query_combines_profile_and_preferences():
+def test_build_query_maps_generic_role_to_skills_not_query():
     request = AnalyzeRequest(
         coverLetter="Spring Redis 프로젝트",
         preferences=Preferences(
             jobRole="백엔드 개발자",
             experienceLevel="신입",
-            techStack=["Spring", "Redis"],
+            techStack=["Java", "Spring Boot", "JPA"],
             region="서울",
         ),
     )
     state = {
         "request": request,
         "user_profile": {
-            "technicalSkills": ["Spring", "Redis"],
-            "jobDirection": "백엔드 개발자",
+            "technicalSkills": ["React"],
+            "jobDirection": "프론트엔드 개발자",
+            "roleSignals": ["프론트엔드"],
         },
     }
 
     result = build_query(state)
 
-    assert result["search_query"]["query"] == "백엔드"
-    assert result["search_query"]["skills"] == ["Spring", "Redis"]
+    assert "query" not in result["search_query"]
+    assert result["search_query"]["skills"] == ["Java", "Spring Boot", "JPA", "Backend"]
     assert result["search_query"]["experience_filter"] == "신입"
+    assert result["search_query"]["urgency"] == "all"
+    assert result["search_query"]["status"] == "active"
+    assert result["search_query"]["limit"] == 10
+    assert "region" not in result["search_query"]
+
+
+def test_build_query_uses_preferences_before_conflicting_profile():
+    request = AnalyzeRequest(
+        coverLetter="React 프로젝트와 Spring 프로젝트를 모두 경험했습니다.",
+        preferences=Preferences(
+            jobRole="프론트엔드 개발자",
+            experienceLevel="주니어",
+            techStack=["React", "TypeScript"],
+            onlyWithReward=True,
+            isUrgent=True,
+        ),
+    )
+    state = {
+        "request": request,
+        "user_profile": {
+            "technicalSkills": ["Java", "Spring Boot"],
+            "jobDirection": "백엔드 개발자",
+            "roleSignals": ["백엔드"],
+        },
+    }
+
+    result = build_query(state)
+
+    assert "query" not in result["search_query"]
+    assert result["search_query"]["skills"] == ["React", "TypeScript", "Frontend"]
+    assert result["search_query"]["experience_filter"] == "주니어"
+    assert result["search_query"]["has_compensation"] is True
+    assert result["search_query"]["urgency"] == "closing_soon"
+
+
+def test_build_query_falls_back_to_profile_skills_and_roles():
+    request = AnalyzeRequest(
+        coverLetter="Python과 LLM으로 AI 백엔드 서비스를 만들었습니다.",
+        preferences=Preferences(),
+    )
+    state = {
+        "request": request,
+        "user_profile": {
+            "technicalSkills": ["Python", "LLM"],
+            "jobDirection": "AI 백엔드 엔지니어",
+            "roleSignals": ["LLM 서비스 개발"],
+        },
+    }
+
+    result = build_query(state)
+
+    assert result["search_query"]["query"] == "LLM"
+    assert result["search_query"]["skills"] == ["Python", "LLM", "AI", "Backend"]
+    assert result["search_query"]["urgency"] == "all"
     assert result["search_query"]["status"] == "active"
     assert result["search_query"]["limit"] == 10
 
 
-def test_build_query_keeps_pathsdog_search_broad_for_many_skills():
+def test_build_query_keeps_distinctive_domain_keyword_in_query():
     request = AnalyzeRequest(
-        coverLetter="제조 데이터와 LLM 경험",
+        coverLetter="Kubernetes와 AWS 운영 경험이 있습니다.",
         preferences=Preferences(
-            jobRole="제조 DX 데이터 엔지니어 Level 2 시스템 개발자",
-            experienceLevel="신입",
-            techStack=[
-                "Python",
-                "CNN",
-                "Azure",
-                "Event Hub",
-                "Stream Analytics",
-                "Databricks",
-                "Blob Storage",
-                "Parquet",
-                "LLM",
-                "Llama",
-                "Gemini",
-            ],
-            region="포항, 광양, 판교, 서울",
+            jobRole="SRE 엔지니어",
+            techStack=["Kubernetes", "AWS"],
         ),
     )
 
     result = build_query({"request": request, "user_profile": {}})
 
-    assert result["search_query"]["query"] == "데이터"
-    assert result["search_query"]["skills"] == ["Python", "LLM"]
-    assert result["search_query"]["experience_filter"] == "신입"
+    assert result["search_query"]["query"] == "SRE"
+    assert result["search_query"]["skills"] == ["Kubernetes", "AWS"]
 
 
 def test_select_tool_name_prefers_search_tool():
