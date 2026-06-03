@@ -41,7 +41,7 @@ def test_build_query_maps_generic_role_to_skills_not_query():
     assert result["search_query"]["experience_filter"] == "신입"
     assert result["search_query"]["urgency"] == "all"
     assert result["search_query"]["status"] == "active"
-    assert result["search_query"]["limit"] == 10
+    assert result["search_query"]["limit"] == 20
     assert "region" not in result["search_query"]
 
 
@@ -126,7 +126,7 @@ def test_build_query_falls_back_to_profile_skills_and_roles():
     assert result["search_query"]["skills"] == ["Python", "LLM", "AI", "Backend"]
     assert result["search_query"]["urgency"] == "all"
     assert result["search_query"]["status"] == "active"
-    assert result["search_query"]["limit"] == 10
+    assert result["search_query"]["limit"] == 20
 
 
 def test_build_query_keeps_distinctive_domain_keyword_in_query():

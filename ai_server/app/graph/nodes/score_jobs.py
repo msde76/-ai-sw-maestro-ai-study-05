@@ -39,7 +39,11 @@ async def score_jobs(state: GraphState, llm: JsonLLM) -> GraphState:
             {"role": "system", "content": system_prompt},
             {
                 "role": "user",
-                "content": f"Score these jobs:\n{json.dumps(payload, ensure_ascii=False)}",
+                "content": (
+                    "candidateJobs의 모든 공고를 평가한 뒤 suitabilityScore 내림차순으로 최대 5개를 반환하세요. "
+                    "적합도가 낮아도 5개 미만이면 남은 후보 중 가장 나은 공고를 낮은 점수 그대로 포함하세요.\n"
+                    f"Score these jobs:\n{json.dumps(payload, ensure_ascii=False)}"
+                ),
             },
         ]
     )

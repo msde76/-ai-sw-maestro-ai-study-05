@@ -8,9 +8,11 @@ class FakeScoringLLM:
     def __init__(self, response=None):
         self.response = response
         self.calls = 0
+        self.messages = None
 
     async def complete_json(self, messages):
         self.calls += 1
+        self.messages = messages
         return self.response or {
             "jobs": [
                 {
@@ -59,6 +61,19 @@ async def test_score_jobs_stores_scored_jobs():
 
 
 @pytest.mark.asyncio
+async def test_score_jobs_prompt_requests_all_candidates_and_top_five():
+    llm = FakeScoringLLM()
+    candidate_jobs = [{"jobId": str(i), "jobTitle": f"공고{i}"} for i in range(1, 8)]
+
+    await score_jobs({"user_profile": {}, "candidate_jobs": candidate_jobs}, llm)
+
+    user_message = llm.messages[1]["content"]
+    assert "candidateJobs의 모든 공고를 평가" in user_message
+    assert "최대 5개" in user_message
+    assert "적합도가 낮아도" in user_message
+
+
+@pytest.mark.asyncio
 async def test_score_jobs_returns_empty_without_llm_call_when_candidate_jobs_empty():
     llm = FakeScoringLLM()
 
@@ -102,7 +117,7 @@ async def test_score_jobs_raises_value_error_for_malformed_job_item():
         await score_jobs({"candidate_jobs": [{"jobId": "1"}]}, llm)
 
 
-def test_format_response_filters_and_sorts_top_five():
+def test_format_response_prioritizes_threshold_and_backfills_to_five():
     state = {
         "scored_jobs": [
             {
@@ -119,7 +134,7 @@ def test_format_response_filters_and_sorts_top_five():
                     "checkpointGuide": "강조 포인트입니다.",
                 },
             }
-            for i, score in enumerate([0.95, 0.91, 0.88, 0.8, 0.7, 0.69], start=1)
+            for i, score in enumerate([0.95, 0.91, 0.68, 0.8, 0.4, 0.69], start=1)
         ]
     }
 
@@ -127,7 +142,7 @@ def test_format_response_filters_and_sorts_top_five():
 
     jobs = result["response_jobs"]
     assert len(jobs) == 5
-    assert [job.suitabilityScore for job in jobs] == [0.95, 0.91, 0.88, 0.8, 0.7]
+    assert [job.suitabilityScore for job in jobs] == [0.95, 0.91, 0.8, 0.69, 0.68]
     assert jobs[0].compensation == "원문 확인 필요"
 
 

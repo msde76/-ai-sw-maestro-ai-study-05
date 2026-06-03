@@ -46,10 +46,14 @@ def _to_job_data(raw: dict) -> JobData:
 
 def format_response(state: GraphState) -> GraphState:
     scored = state.get("scored_jobs", [])
-    filtered = [
+    valid_items = [
         item
         for item in scored
-        if isinstance(item, dict) and _score(item) >= 0.7
+        if isinstance(item, dict)
     ]
-    filtered.sort(key=_score, reverse=True)
-    return {"response_jobs": [_to_job_data(item) for item in filtered[:5]]}
+    strong_matches = [item for item in valid_items if _score(item) >= 0.7]
+    backfill_matches = [item for item in valid_items if 0.0 < _score(item) < 0.7]
+    strong_matches.sort(key=_score, reverse=True)
+    backfill_matches.sort(key=_score, reverse=True)
+    selected = [*strong_matches, *backfill_matches][:5]
+    return {"response_jobs": [_to_job_data(item) for item in selected]}

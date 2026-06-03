@@ -5,6 +5,7 @@ from app.graph.state import GraphState
 
 
 MAX_BASE_SEARCH_SKILLS = 2
+SEARCH_LIMIT = 20
 
 SEARCH_SKILL_PRIORITY = [
     "Python",
@@ -61,7 +62,7 @@ def build_query(state: GraphState) -> GraphState:
         "has_compensation": request.preferences.onlyWithReward,
         "urgency": "closing_soon" if request.preferences.isUrgent else "all",
         "status": "active",
-        "limit": 10,
+        "limit": SEARCH_LIMIT,
     }
     return {"search_query": _without_empty_values(search_query)}
 
