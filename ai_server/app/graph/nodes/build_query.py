@@ -1,3 +1,4 @@
+import re
 from collections.abc import Iterable
 
 from app.graph.state import GraphState
@@ -14,7 +15,7 @@ ROLE_SKILL_RULES: tuple[tuple[tuple[str, ...], str], ...] = (
     (("ai", "머신러닝", "ml", "machine learning"), "AI"),
 )
 
-DOMAIN_KEYWORDS: tuple[tuple[str, str], ...] = (
+DOMAIN_KEYWORDS: tuple[tuple[tuple[str, ...], str], ...] = (
     (("sre",), "SRE"),
     (("머신러닝",), "머신러닝"),
     (("게임서버",), "게임서버"),
@@ -75,7 +76,8 @@ def _role_skills(role_texts: list[str]) -> list[str]:
     joined_text = " ".join(role_texts).lower()
     matches: list[tuple[int, int, str]] = []
     for rule_index, (needles, skill) in enumerate(ROLE_SKILL_RULES):
-        positions = [joined_text.find(needle) for needle in needles if needle in joined_text]
+        positions = [_find_keyword_position(joined_text, needle) for needle in needles]
+        positions = [position for position in positions if position >= 0]
         if positions:
             matches.append((min(positions), rule_index, skill))
 
@@ -90,11 +92,18 @@ def _domain_query(role_texts: list[str]) -> str:
     joined_text = " ".join(role_texts).lower()
     matches: list[str] = []
     for needles, keyword in DOMAIN_KEYWORDS:
-        if any(needle in joined_text for needle in needles):
+        if any(_find_keyword_position(joined_text, needle) >= 0 for needle in needles):
             matches.append(keyword)
         if len(matches) >= 2:
             break
     return " ".join(matches)
+
+
+def _find_keyword_position(text: str, keyword: str) -> int:
+    if keyword.isascii():
+        match = re.search(rf"(?<![a-z0-9]){re.escape(keyword.lower())}(?![a-z0-9])", text)
+        return match.start() if match else -1
+    return text.find(keyword)
 
 
 def _experience_filter(experience_level: str) -> str:

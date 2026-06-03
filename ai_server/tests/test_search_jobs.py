@@ -131,6 +131,19 @@ def test_build_query_maps_english_role_aliases_to_skills():
     assert result["search_query"]["skills"] == ["TypeScript", "Backend", "Frontend", "Fullstack"]
 
 
+@pytest.mark.parametrize("role", ["HTML 퍼블리셔", "Mainframe developer", "frontier engineer"])
+def test_build_query_does_not_match_english_aliases_inside_words(role):
+    request = AnalyzeRequest(
+        coverLetter="Publication and enterprise systems experience.",
+        preferences=Preferences(jobRole=role, techStack=["CSS"]),
+    )
+
+    result = build_query({"request": request, "user_profile": {}})
+
+    assert "query" not in result["search_query"]
+    assert result["search_query"]["skills"] == ["CSS"]
+
+
 def test_select_tool_name_prefers_search_tool():
     tools = ["get_job_detail", "search_jobs", "list_companies"]
 
