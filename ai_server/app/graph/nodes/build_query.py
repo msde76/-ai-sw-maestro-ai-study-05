@@ -1,12 +1,39 @@
+from collections.abc import Iterable
+
 from app.graph.state import GraphState
+
+
+ROLE_SKILL_RULES: tuple[tuple[tuple[str, ...], str], ...] = (
+    (("백엔드", "서버"), "Backend"),
+    (("프론트엔드", "프론트"), "Frontend"),
+    (("풀스택",), "Fullstack"),
+    (("ios",), "iOS"),
+    (("android",), "Android"),
+    (("devops", "인프라"), "DevOps"),
+    (("데이터",), "Data Analysis"),
+    (("ai", "머신러닝", "ml"), "AI"),
+)
+
+DOMAIN_KEYWORDS: tuple[tuple[str, str], ...] = (
+    (("sre",), "SRE"),
+    (("머신러닝",), "머신러닝"),
+    (("게임서버",), "게임서버"),
+    (("llm",), "LLM"),
+    (("보안",), "보안"),
+    (("qa",), "QA"),
+)
 
 
 def build_query(state: GraphState) -> GraphState:
     request = state["request"]
     profile = state.get("user_profile", {})
-    role = request.preferences.jobRole or profile.get("jobDirection", "")
-    skills = _search_skills(request.preferences.techStack or profile.get("technicalSkills", []))
-    query = _domain_query(role)
+
+    role_texts = _role_texts(request.preferences.jobRole, profile)
+    skills = _skills_with_role_tokens(
+        request.preferences.techStack or profile.get("technicalSkills", []),
+        role_texts,
+    )
+    query = _domain_query(role_texts)
 
     search_query = {
         "query": query,
@@ -17,38 +44,57 @@ def build_query(state: GraphState) -> GraphState:
         "status": "active",
         "limit": 10,
     }
-    return {"search_query": {key: value for key, value in search_query.items() if value not in ("", [], None)}}
+    return {"search_query": _without_empty_values(search_query)}
 
 
-def _domain_query(role: str) -> str:
-    domain_keywords = ["데이터", "머신러닝", "AI", "LLM", "백엔드", "프론트엔드", "인프라", "DevOps", "SRE"]
-    matches = [keyword for keyword in domain_keywords if keyword.lower() in role.lower()]
-    if matches:
-        return " ".join(matches[:2])
+def _role_texts(preferred_role: str, profile: dict) -> list[str]:
+    if preferred_role.strip():
+        return [preferred_role.strip()]
 
-    generic_terms = ["개발자", "엔지니어", "채용", "공고", "신입", "경력"]
-    query = role
-    for term in generic_terms:
-        query = query.replace(term, " ")
-    return " ".join(query.split())
+    texts: list[str] = []
+    job_direction = str(profile.get("jobDirection", "")).strip()
+    if job_direction:
+        texts.append(job_direction)
+
+    role_signals = profile.get("roleSignals", [])
+    if isinstance(role_signals, list):
+        texts.extend(str(signal).strip() for signal in role_signals if str(signal).strip())
+
+    return texts
 
 
-def _search_skills(skills: list[str]) -> list[str]:
-    priority = ["Python", "LLM", "Java", "Spring", "Backend", "React", "SQL", "Azure", "AWS"]
-    selected: list[str] = []
-    for wanted in priority:
-        for skill in skills:
-            if skill.lower() == wanted.lower() and skill not in selected:
-                selected.append(skill)
-                break
-        if len(selected) >= 2:
-            return selected
-    for skill in skills:
-        if skill not in selected:
-            selected.append(skill)
-        if len(selected) >= 2:
+def _skills_with_role_tokens(base_skills: Iterable[str], role_texts: list[str]) -> list[str]:
+    skills = _unique_texts(base_skills)
+    for role_skill in _role_skills(role_texts):
+        if not _contains_case_insensitive(skills, role_skill):
+            skills.append(role_skill)
+    return skills
+
+
+def _role_skills(role_texts: list[str]) -> list[str]:
+    joined_text = " ".join(role_texts).lower()
+    matches: list[tuple[int, int, str]] = []
+    for rule_index, (needles, skill) in enumerate(ROLE_SKILL_RULES):
+        positions = [joined_text.find(needle) for needle in needles if needle in joined_text]
+        if positions:
+            matches.append((min(positions), rule_index, skill))
+
+    matched: list[str] = []
+    for _, _, skill in sorted(matches):
+        if not _contains_case_insensitive(matched, skill):
+            matched.append(skill)
+    return matched
+
+
+def _domain_query(role_texts: list[str]) -> str:
+    joined_text = " ".join(role_texts).lower()
+    matches: list[str] = []
+    for needles, keyword in DOMAIN_KEYWORDS:
+        if any(needle in joined_text for needle in needles):
+            matches.append(keyword)
+        if len(matches) >= 2:
             break
-    return selected
+    return " ".join(matches)
 
 
 def _experience_filter(experience_level: str) -> str:
@@ -56,3 +102,21 @@ def _experience_filter(experience_level: str) -> str:
         if value in experience_level:
             return value
     return ""
+
+
+def _unique_texts(values: Iterable[str]) -> list[str]:
+    unique: list[str] = []
+    for value in values:
+        text = str(value).strip()
+        if text and not _contains_case_insensitive(unique, text):
+            unique.append(text)
+    return unique
+
+
+def _contains_case_insensitive(values: list[str], target: str) -> bool:
+    lowered_target = target.lower()
+    return any(value.lower() == lowered_target for value in values)
+
+
+def _without_empty_values(search_query: dict) -> dict:
+    return {key: value for key, value in search_query.items() if value not in ("", [], None)}
