@@ -5,8 +5,13 @@ from app.graph.nodes.score_jobs import score_jobs
 
 
 class FakeScoringLLM:
+    def __init__(self, response=None):
+        self.response = response
+        self.calls = 0
+
     async def complete_json(self, messages):
-        return {
+        self.calls += 1
+        return self.response or {
             "jobs": [
                 {
                     "jobId": "1",
@@ -53,6 +58,32 @@ async def test_score_jobs_stores_scored_jobs():
     assert result["scored_jobs"][0]["suitabilityScore"] == 0.9
 
 
+@pytest.mark.asyncio
+async def test_score_jobs_returns_empty_without_llm_call_when_candidate_jobs_empty():
+    llm = FakeScoringLLM()
+
+    result = await score_jobs({"candidate_jobs": []}, llm)
+
+    assert result == {"scored_jobs": []}
+    assert llm.calls == 0
+
+
+@pytest.mark.asyncio
+async def test_score_jobs_raises_value_error_for_non_list_jobs_payload():
+    llm = FakeScoringLLM(response={"jobs": {"jobId": "1"}})
+
+    with pytest.raises(ValueError, match="jobs"):
+        await score_jobs({"candidate_jobs": [{"jobId": "1"}]}, llm)
+
+
+@pytest.mark.asyncio
+async def test_score_jobs_raises_value_error_for_malformed_job_item():
+    llm = FakeScoringLLM(response={"jobs": [{"jobId": "1"}, "bad-job"]})
+
+    with pytest.raises(ValueError, match="jobs"):
+        await score_jobs({"candidate_jobs": [{"jobId": "1"}]}, llm)
+
+
 def test_format_response_filters_and_sorts_top_five():
     state = {
         "scored_jobs": [
@@ -80,3 +111,71 @@ def test_format_response_filters_and_sorts_top_five():
     assert len(jobs) == 5
     assert [job.suitabilityScore for job in jobs] == [0.95, 0.91, 0.88, 0.8, 0.7]
     assert jobs[0].compensation == "원문 확인 필요"
+
+
+def test_format_response_clamps_out_of_range_score_before_formatting():
+    result = format_response(
+        {
+            "scored_jobs": [
+                {
+                    "jobId": "1",
+                    "companyName": "A",
+                    "jobTitle": "백엔드 개발자",
+                    "suitabilityScore": 1.2,
+                    "originalLink": "https://example.com/1",
+                    "analysis": {},
+                }
+            ]
+        }
+    )
+
+    assert len(result["response_jobs"]) == 1
+    assert result["response_jobs"][0].suitabilityScore == 1.0
+
+
+def test_format_response_treats_non_finite_and_invalid_scores_as_zero():
+    result = format_response(
+        {
+            "scored_jobs": [
+                {"jobId": "nan", "suitabilityScore": float("nan")},
+                {"jobId": "inf", "suitabilityScore": float("inf")},
+                {"jobId": "bad", "suitabilityScore": "not-a-number"},
+            ]
+        }
+    )
+
+    assert result["response_jobs"] == []
+
+
+def test_format_response_normalizes_non_string_original_link_to_none():
+    result = format_response(
+        {
+            "scored_jobs": [
+                {
+                    "jobId": "1",
+                    "suitabilityScore": 0.8,
+                    "originalLink": {"href": "https://example.com/1"},
+                }
+            ]
+        }
+    )
+
+    assert result["response_jobs"][0].originalLink is None
+
+
+def test_format_response_uses_fallback_defaults_for_missing_analysis():
+    result = format_response(
+        {
+            "scored_jobs": [
+                {
+                    "jobId": "1",
+                    "suitabilityScore": 0.8,
+                }
+            ]
+        }
+    )
+
+    analysis = result["response_jobs"][0].analysis
+    assert analysis.matchReason == "추천 이유가 충분히 생성되지 않았습니다."
+    assert analysis.missingPoints == "보완점 정보가 충분히 생성되지 않았습니다."
+    assert analysis.checkpointGuide == "지원 전 원문 공고를 확인하세요."

@@ -13,6 +13,15 @@ class JsonLLM(Protocol):
 PROMPT_PATH = Path(__file__).resolve().parents[2] / "prompts" / "suitability_scoring.md"
 
 
+def _validate_scoring_response(response: dict) -> list[dict]:
+    jobs = response.get("jobs") if isinstance(response, dict) else None
+    if not isinstance(jobs, list):
+        raise ValueError("LLM scoring response must include a jobs list")
+    if not all(isinstance(job, dict) for job in jobs):
+        raise ValueError("LLM scoring response jobs must be objects")
+    return jobs
+
+
 async def score_jobs(state: GraphState, llm: JsonLLM) -> GraphState:
     candidate_jobs = state.get("candidate_jobs", [])
     if not candidate_jobs:
@@ -32,5 +41,4 @@ async def score_jobs(state: GraphState, llm: JsonLLM) -> GraphState:
             },
         ]
     )
-    jobs = response.get("jobs", [])
-    return {"scored_jobs": jobs if isinstance(jobs, list) else []}
+    return {"scored_jobs": _validate_scoring_response(response)}

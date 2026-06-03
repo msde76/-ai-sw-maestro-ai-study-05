@@ -1,3 +1,5 @@
+import math
+
 from app.api.schemas import Analysis, JobData
 from app.graph.state import GraphState
 
@@ -10,21 +12,30 @@ DEFAULT_CHECKPOINT_GUIDE = "지원 전 원문 공고를 확인하세요."
 
 def _score(raw: dict) -> float:
     try:
-        return float(raw.get("suitabilityScore") or 0.0)
+        score = float(raw.get("suitabilityScore") or 0.0)
     except (TypeError, ValueError):
         return 0.0
+    if not math.isfinite(score):
+        return 0.0
+    return max(0.0, min(score, 1.0))
+
+
+def _original_link(raw: dict) -> str | None:
+    value = raw.get("originalLink")
+    return value if isinstance(value, str) else None
 
 
 def _to_job_data(raw: dict) -> JobData:
     analysis = raw.get("analysis") if isinstance(raw.get("analysis"), dict) else {}
+    original_link = _original_link(raw)
     return JobData(
-        jobId=str(raw.get("jobId") or raw.get("id") or raw.get("originalLink") or "unknown"),
+        jobId=str(raw.get("jobId") or raw.get("id") or original_link or "unknown"),
         companyName=str(raw.get("companyName") or DEFAULT_TEXT),
         jobTitle=str(raw.get("jobTitle") or DEFAULT_TEXT),
         suitabilityScore=_score(raw),
         compensation=str(raw.get("compensation") or DEFAULT_TEXT),
         deadline=str(raw.get("deadline") or DEFAULT_TEXT),
-        originalLink=raw.get("originalLink"),
+        originalLink=original_link,
         analysis=Analysis(
             matchReason=str(analysis.get("matchReason") or DEFAULT_MATCH_REASON),
             missingPoints=str(analysis.get("missingPoints") or DEFAULT_MISSING_POINTS),
