@@ -112,6 +112,25 @@ def test_build_query_keeps_distinctive_domain_keyword_in_query():
     assert result["search_query"]["skills"] == ["Kubernetes", "AWS"]
 
 
+def test_build_query_maps_english_role_aliases_to_skills():
+    request = AnalyzeRequest(
+        coverLetter="Worked across product surfaces and platform APIs.",
+        preferences=Preferences(jobRole="backend frontend fullstack"),
+    )
+    state = {
+        "request": request,
+        "user_profile": {
+            "technicalSkills": ["TypeScript"],
+            "jobDirection": "backend server",
+        },
+    }
+
+    result = build_query(state)
+
+    assert "query" not in result["search_query"]
+    assert result["search_query"]["skills"] == ["TypeScript", "Backend", "Frontend", "Fullstack"]
+
+
 def test_select_tool_name_prefers_search_tool():
     tools = ["get_job_detail", "search_jobs", "list_companies"]
 

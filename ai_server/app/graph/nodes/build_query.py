@@ -4,14 +4,14 @@ from app.graph.state import GraphState
 
 
 ROLE_SKILL_RULES: tuple[tuple[tuple[str, ...], str], ...] = (
-    (("백엔드", "서버"), "Backend"),
-    (("프론트엔드", "프론트"), "Frontend"),
-    (("풀스택",), "Fullstack"),
+    (("백엔드", "서버", "backend", "server"), "Backend"),
+    (("프론트엔드", "프론트", "frontend", "front"), "Frontend"),
+    (("풀스택", "fullstack"), "Fullstack"),
     (("ios",), "iOS"),
     (("android",), "Android"),
-    (("devops", "인프라"), "DevOps"),
-    (("데이터",), "Data Analysis"),
-    (("ai", "머신러닝", "ml"), "AI"),
+    (("devops", "인프라", "infra"), "DevOps"),
+    (("데이터", "data"), "Data Analysis"),
+    (("ai", "머신러닝", "ml", "machine learning"), "AI"),
 )
 
 DOMAIN_KEYWORDS: tuple[tuple[str, str], ...] = (
