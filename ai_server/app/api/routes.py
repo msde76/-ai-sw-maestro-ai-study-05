@@ -1,6 +1,10 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 from app.api.schemas import AnalyzeRequest, JobData
+from app.core.config import Settings
+from app.core.llm import UpstageLLM
+from app.graph.workflow import build_workflow, run_workflow
+from app.integrations.pathsdog_mcp import PathsdogMCPClient
 
 
 router = APIRouter()
@@ -8,4 +12,13 @@ router = APIRouter()
 
 @router.post("/ai/analyze", response_model=list[JobData])
 async def analyze_jobs(request: AnalyzeRequest) -> list[JobData]:
-    return []
+    try:
+        settings = Settings()
+        llm = UpstageLLM(settings)
+        search_client = PathsdogMCPClient(str(settings.pathsdog_mcp_url))
+        workflow = build_workflow(llm, search_client)
+        return await run_workflow(workflow, request)
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="AI workflow failed") from exc

@@ -3,7 +3,13 @@ from fastapi.testclient import TestClient
 from main import app
 
 
-def test_analyze_accepts_spring_payload_and_returns_list():
+def test_analyze_accepts_spring_payload_and_returns_list(monkeypatch):
+    async def fake_run_workflow(workflow, request):
+        return []
+
+    monkeypatch.setenv("UPSTAGE_API_KEY", "test-key")
+    monkeypatch.setattr("app.api.routes.build_workflow", lambda llm, search_client: object())
+    monkeypatch.setattr("app.api.routes.run_workflow", fake_run_workflow)
     client = TestClient(app)
     payload = {
         "coverLetter": "Spring Boot 프로젝트에서 예약 API와 Redis 캐시를 구현했습니다.",
