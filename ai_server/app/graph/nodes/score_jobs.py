@@ -11,17 +11,34 @@ class JsonLLM(Protocol):
 
 
 PROMPT_PATH = Path(__file__).resolve().parents[2] / "prompts" / "suitability_scoring.md"
+JOB_LIST_KEYS = ("jobs", "recommendations", "results", "items", "scoredJobs", "topMatches")
 
 
 def _validate_scoring_response(response: dict) -> list[dict]:
-    jobs = response.get("jobs") if isinstance(response, dict) else None
-    if jobs is None and isinstance(response, dict) and "jobId" in response:
+    if not isinstance(response, dict):
+        raise ValueError("LLM scoring response must include a jobs list")
+    if "jobId" in response:
         return [response]
+
+    jobs = _job_list_from_response(response)
     if not isinstance(jobs, list):
         raise ValueError("LLM scoring response must include a jobs list")
-    if not all(isinstance(job, dict) for job in jobs):
+    valid_jobs = [job for job in jobs if isinstance(job, dict)]
+    if not valid_jobs:
         raise ValueError("LLM scoring response jobs must be objects")
-    return jobs
+    return valid_jobs
+
+
+def _job_list_from_response(response: dict) -> list | None:
+    for key in JOB_LIST_KEYS:
+        value = response.get(key)
+        if isinstance(value, list):
+            return value
+
+    list_values = [value for value in response.values() if isinstance(value, list)]
+    if len(list_values) == 1:
+        return list_values[0]
+    return None
 
 
 async def score_jobs(state: GraphState, llm: JsonLLM) -> GraphState:
@@ -41,7 +58,8 @@ async def score_jobs(state: GraphState, llm: JsonLLM) -> GraphState:
                 "role": "user",
                 "content": (
                     "candidateJobs의 모든 공고를 평가한 뒤 suitabilityScore 내림차순으로 최대 5개를 반환하세요. "
-                    "적합도가 낮아도 5개 미만이면 남은 후보 중 가장 나은 공고를 낮은 점수 그대로 포함하세요.\n"
+                    "적합도가 낮아도 5개 미만이면 남은 후보 중 가장 나은 공고를 낮은 점수 그대로 포함하세요. "
+                    "반드시 JSON 객체의 jobs 배열로 반환하세요.\n"
                     f"Score these jobs:\n{json.dumps(payload, ensure_ascii=False)}"
                 ),
             },

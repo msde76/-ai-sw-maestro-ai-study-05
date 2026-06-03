@@ -71,6 +71,7 @@ async def test_score_jobs_prompt_requests_all_candidates_and_top_five():
     assert "candidateJobs의 모든 공고를 평가" in user_message
     assert "최대 5개" in user_message
     assert "적합도가 낮아도" in user_message
+    assert "jobs 배열" in user_message
 
 
 @pytest.mark.asyncio
@@ -102,6 +103,50 @@ async def test_score_jobs_accepts_single_top_level_job_payload():
 
 
 @pytest.mark.asyncio
+async def test_score_jobs_accepts_common_list_payload_aliases():
+    llm = FakeScoringLLM(
+        response={
+            "recommendations": [
+                {
+                    "jobId": "1",
+                    "companyName": "A",
+                    "jobTitle": "백엔드 개발자",
+                    "suitabilityScore": 0.85,
+                    "analysis": {},
+                }
+            ]
+        }
+    )
+
+    result = await score_jobs({"candidate_jobs": [{"jobId": "1"}]}, llm)
+
+    assert len(result["scored_jobs"]) == 1
+    assert result["scored_jobs"][0]["jobId"] == "1"
+
+
+@pytest.mark.asyncio
+async def test_score_jobs_accepts_single_list_value_payload():
+    llm = FakeScoringLLM(
+        response={
+            "topMatches": [
+                {
+                    "jobId": "1",
+                    "companyName": "A",
+                    "jobTitle": "백엔드 개발자",
+                    "suitabilityScore": 0.85,
+                    "analysis": {},
+                }
+            ]
+        }
+    )
+
+    result = await score_jobs({"candidate_jobs": [{"jobId": "1"}]}, llm)
+
+    assert len(result["scored_jobs"]) == 1
+    assert result["scored_jobs"][0]["jobId"] == "1"
+
+
+@pytest.mark.asyncio
 async def test_score_jobs_raises_value_error_for_non_list_jobs_payload():
     llm = FakeScoringLLM(response={"jobs": {"jobId": "1"}})
 
@@ -110,8 +155,18 @@ async def test_score_jobs_raises_value_error_for_non_list_jobs_payload():
 
 
 @pytest.mark.asyncio
-async def test_score_jobs_raises_value_error_for_malformed_job_item():
+async def test_score_jobs_ignores_non_object_items_when_valid_jobs_exist():
     llm = FakeScoringLLM(response={"jobs": [{"jobId": "1"}, "bad-job"]})
+
+    result = await score_jobs({"candidate_jobs": [{"jobId": "1"}]}, llm)
+
+    assert len(result["scored_jobs"]) == 1
+    assert result["scored_jobs"][0]["jobId"] == "1"
+
+
+@pytest.mark.asyncio
+async def test_score_jobs_raises_value_error_when_no_valid_job_objects_exist():
+    llm = FakeScoringLLM(response={"jobs": ["bad-job"]})
 
     with pytest.raises(ValueError, match="jobs"):
         await score_jobs({"candidate_jobs": [{"jobId": "1"}]}, llm)

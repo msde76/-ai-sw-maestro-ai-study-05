@@ -46,7 +46,7 @@ flowchart LR
     Check -->|"YES"| Query["build_query"]
     Query -->|"search_query"| Pathsdog["Pathsdog MCP"]
     Pathsdog -->|"candidate_jobs[]"| Score["score_jobs\nUpstage LLM"]
-    Score --> Format["format_response\nscore >= 0.7\n상위 5개"]
+    Score --> Format["format_response\n0.7 이상 우선\n부족하면 낮은 점수 후보 보충\n최대 5개"]
     Format -->|"JobData[]"| Spring
     Empty -->|"JobData[]"| Spring
 ```
@@ -140,79 +140,92 @@ Response:
 ```json
 [
   {
+    "jobId": "529",
+    "companyName": "토스",
+    "jobTitle": "Server Developer [병역특례] (Product)",
+    "suitabilityScore": 0.98,
+    "compensation": "원문 확인 필요",
+    "deadline": "상시채용",
+    "originalLink": "https://toss.im/career/job-detail?job_id=4773428003",
+    "analysis": {
+      "matchReason": "Java, Spring Boot, Backend, JWT, GitHub, CI/CD, 테스트 자동화 등 핵심 기술 스택과 역할이 거의 일치하며, 병역특례 가능",
+      "missingPoints": "프로젝트 규모, 팀 인원, 프로젝트 기간, 성능 개선 수치, 테스트 커버리지, 포트폴리오 링크 등은 추가 확인이 필요합니다.",
+      "checkpointGuide": "GitHub 포트폴리오와 프로젝트 상세 내용을 정리하고, Spring Boot, JWT, Redis, AWS, CI/CD, 테스트 자동화 관련 심화 질문을 준비하세요."
+    }
+  },
+  {
+    "jobId": "530",
+    "companyName": "토스",
+    "jobTitle": "Server Developer (Product)",
+    "suitabilityScore": 0.97,
+    "compensation": "원문 확인 필요",
+    "deadline": "상시채용",
+    "originalLink": "https://toss.im/career/job-detail?job_id=4071141003&sub_position_id=4071141003&company=%ED%86%A0%EC%8A%A4",
+    "analysis": {
+      "matchReason": "Java, Spring Boot, Backend, JWT, GitHub, CI/CD, 테스트 자동화 등 핵심 기술 스택과 역할이 일치합니다.",
+      "missingPoints": "프로젝트 규모, 팀 인원, 프로젝트 기간, 성능 개선 수치, 테스트 커버리지, 포트폴리오 링크 등은 추가 확인이 필요합니다.",
+      "checkpointGuide": "GitHub 포트폴리오와 프로젝트 상세 내용을 정리하고, 토스 기술 스택 및 개발 프로세스를 추가 학습하세요."
+    }
+  },
+  {
+    "jobId": "531",
+    "companyName": "토스인컴",
+    "jobTitle": "Server Developer (Product)",
+    "suitabilityScore": 0.96,
+    "compensation": "원문 확인 필요",
+    "deadline": "상시채용",
+    "originalLink": "https://toss.im/career/job-detail?job_id=4071141003&sub_position_id=6027071003&company=%ED%86%A0%EC%8A%A4%EC%9D%B8%EC%BB%B4",
+    "analysis": {
+      "matchReason": "Java, Spring Boot, Backend, JWT, GitHub, CI/CD, 테스트 자동화 등 핵심 기술 스택과 역할이 일치합니다.",
+      "missingPoints": "프로젝트 규모, 팀 인원, 프로젝트 기간, 성능 개선 수치, 테스트 커버리지, 포트폴리오 링크 등은 추가 확인이 필요합니다.",
+      "checkpointGuide": "GitHub 포트폴리오와 프로젝트 상세 내용을 정리하고, 토스인컴 기술 스택 및 개발 프로세스를 추가 학습하세요."
+    }
+  },
+  {
     "jobId": "639",
     "companyName": "김캐디",
     "jobTitle": "백엔드 개발자 포지션 (신입~3년차, 병특)",
-    "suitabilityScore": 0.92,
+    "suitabilityScore": 0.94,
     "compensation": "원문 확인 필요",
     "deadline": "상시채용",
     "originalLink": "https://kimcaddie.career.greetinghr.com/ko/o/206177",
     "analysis": {
-      "matchReason": "Java, Spring Boot, JPA, MySQL, Redis, Docker, AWS, Nginx 등 핵심 기술 스택이 일치하며, REST API 설계, JWT 인증, 데이터베이스 성능 최적화, 배포 및 운영 환경 관리 경험이 요구 사항과 부합합니다.",
-      "missingPoints": "구체적인 프로젝트 규모 및 팀 인원, 실제 운영 환경에서의 장애 대응 경험, 성능 개선 수치, CI/CD 파이프라인 구축 경험은 추가 확인이 필요합니다.",
-      "checkpointGuide": "프로젝트 규모, 장애 대응 사례, 성능 개선 수치, CI/CD 경험, 테스트 자동화 수준을 지원 전 확인하세요."
-    }
-  },
-  {
-    "jobId": "1548",
-    "companyName": "두잇",
-    "jobTitle": "[전문연구요원] Software Engineer(신규, 전직)",
-    "suitabilityScore": 0.88,
-    "compensation": "원문 확인 필요",
-    "deadline": "상시채용",
-    "originalLink": "https://teamdoeat.career.greetinghr.com/ko/o/127704",
-    "analysis": {
-      "matchReason": "Java, Spring, JPA, Docker, AWS, Redis 등 주요 기술 스택이 일치하며, 코드 리뷰 및 협업 경험이 요구 사항과 부합합니다.",
-      "missingPoints": "운영 환경 장애 대응 경험과 CI/CD 파이프라인 구축 경험은 추가 확인이 필요합니다.",
-      "checkpointGuide": "백엔드 API 설계, 협업 방식, 배포 경험을 중심으로 자기소개서 내용을 보강하세요."
-    }
-  },
-  {
-    "jobId": "1535",
-    "companyName": "QANDA",
-    "jobTitle": "백엔드 엔지니어 (산업기능요원 / 전문연구요원)",
-    "suitabilityScore": 0.85,
-    "compensation": "원문 확인 필요",
-    "deadline": "상시채용",
-    "originalLink": "https://recruit.mathpresso.com/ko/o/179693",
-    "analysis": {
-      "matchReason": "Java, Spring, JPA, Docker, Redis 등 핵심 기술 스택이 일치하며, API 설계와 데이터베이스 성능 최적화 경험이 요구 사항과 부합합니다.",
-      "missingPoints": "대규모 트래픽 처리 경험과 실제 서비스 운영 경험은 추가 확인이 필요합니다.",
-      "checkpointGuide": "N+1 쿼리 개선, 인덱스 적용, 테스트 작성 경험을 구체적인 수치와 함께 정리하세요."
+      "matchReason": "Java, Spring Boot, Spring, JPA, MySQL, Redis, Docker, AWS, Nginx, GitHub 등 핵심 기술 스택과 역할이 일치하며, 병역특례 가능",
+      "missingPoints": "프로젝트 규모, 팀 인원, 프로젝트 기간, 성능 개선 수치, 테스트 커버리지, 포트폴리오 링크 등은 추가 확인이 필요합니다.",
+      "checkpointGuide": "GitHub 포트폴리오와 프로젝트 상세 내용을 정리하고, Spring Boot, JWT, Redis, AWS, CI/CD, 테스트 자동화 관련 심화 질문을 준비하세요."
     }
   },
   {
     "jobId": "1606",
     "companyName": "HYBE",
     "jobTitle": "[Weverse Company] Back-end (경력 무관)",
-    "suitabilityScore": 0.8,
+    "suitabilityScore": 0.92,
     "compensation": "원문 확인 필요",
     "deadline": "상시채용",
     "originalLink": "https://careers.hybecorp.com/ko/o/210534",
     "analysis": {
-      "matchReason": "Java, Spring, Redis 등 주요 백엔드 기술과 데이터베이스 성능 최적화 및 배포 경험이 공고와 관련성이 있습니다.",
-      "missingPoints": "Kafka 등 메시징 시스템 경험과 대규모 서비스 운영 경험은 추가 확인이 필요합니다.",
-      "checkpointGuide": "Redis 캐시, AWS 배포, API 장애 대응 경험을 중심으로 지원 가능성을 점검하세요."
-    }
-  },
-  {
-    "jobId": "1283",
-    "companyName": "ESTgames",
-    "jobTitle": "웹 개발자 (TypeScript, Next.js, Java, Spring)",
-    "suitabilityScore": 0.75,
-    "compensation": "원문 확인 필요",
-    "deadline": "상시채용",
-    "originalLink": "https://estfamily.career.greetinghr.com/ko/o/107360",
-    "analysis": {
-      "matchReason": "Java, Spring, MySQL, Redis, Docker 등 백엔드 기술 스택이 일치하며, API 설계와 데이터베이스 개선 경험이 공고와 관련됩니다.",
-      "missingPoints": "TypeScript, Next.js 등 프론트엔드 기술 경험은 추가 확인이 필요합니다.",
-      "checkpointGuide": "백엔드 중심 역량을 강조하되, 웹 프론트엔드 협업 경험이 있다면 함께 정리하세요."
+      "matchReason": "Java, Spring, Backend, Redis, Kafka 등 핵심 기술 스택과 역할이 일치하며, 판교 근무 가능",
+      "missingPoints": "프로젝트 규모, 팀 인원, 프로젝트 기간, 성능 개선 수치, 테스트 커버리지, 포트폴리오 링크 등은 추가 확인이 필요합니다.",
+      "checkpointGuide": "GitHub 포트폴리오와 프로젝트 상세 내용을 정리하고, Spring Boot, JWT, Redis, Kafka, AWS, CI/CD, 테스트 자동화 관련 심화 질문을 준비하세요."
     }
   }
 ]
 ```
 
-최종 응답은 `suitabilityScore >= 0.7`인 공고만 남기고 점수 기준 내림차순으로 정렬합니다. 현재 구현은 최대 5개까지 반환합니다.
+이 예시 요청에서 `build_query`가 Pathsdog MCP에 전달하는 검색 파라미터는 아래처럼 축소됩니다. Spring DTO의 `techStack`은 상세 적합도 분석에는 계속 사용하지만, MCP 검색에서는 너무 많은 기술을 모두 필터로 걸면 후보가 0건으로 좁아질 수 있으므로 핵심 기술 2개와 역할 토큰을 사용합니다.
+
+```json
+{
+  "skills": ["Java", "Spring Boot", "Backend"],
+  "experience_filter": "신입",
+  "has_compensation": false,
+  "urgency": "all",
+  "status": "active",
+  "limit": 20
+}
+```
+
+최종 응답은 `suitabilityScore >= 0.7`인 공고를 우선하고 점수 기준 내림차순으로 정렬합니다. 5개 미만이면 `0 < suitabilityScore < 0.7` 후보를 점수순으로 보충해 최대 5개까지 반환합니다. `0점` 또는 점수 파싱이 불가능한 공고는 보충하지 않습니다.
 
 ## 환경변수 설정
 
