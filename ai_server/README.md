@@ -51,6 +51,8 @@ flowchart LR
     Empty -->|"JobData[]"| Spring
 ```
 
+`score_jobs` 단계는 Upstage Chat Completions의 `response_format.type=json_schema` structured output을 사용해 LLM 응답을 `{"jobs": [...]}` 객체로 강제합니다. 서버는 그래도 방어적으로 응답을 한 번 더 검증하며, `jobs`가 아닌 흔한 목록 key나 비객체 항목이 섞이는 경우를 보정하거나 거부합니다.
+
 ## 요청 형식
 
 Endpoint:
