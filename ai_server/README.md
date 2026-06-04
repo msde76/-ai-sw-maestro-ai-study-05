@@ -53,6 +53,47 @@ flowchart LR
 
 `score_jobs` 단계는 Upstage Chat Completions의 `response_format.type=json_schema` structured output을 사용해 LLM 응답을 `{"jobs": [...]}` 객체로 강제합니다. 서버는 그래도 방어적으로 응답을 한 번 더 검증하며, `jobs`가 아닌 흔한 목록 key나 비객체 항목이 섞이는 경우를 보정하거나 거부합니다.
 
+## LangGraph 내부 흐름
+
+`run_workflow`는 `{"request": AnalyzeRequest}`를 초기 `GraphState`로 넣고 `workflow.ainvoke`를 실행합니다. 각 노드는 필요한 값만 state에 추가로 반환하며, LangGraph가 이를 누적해 다음 노드로 넘깁니다.
+
+```mermaid
+flowchart TD
+    Start([GraphState 초기값<br/>request])
+    Analyze["analyze_user<br/>Upstage LLM으로 자기소개서/희망조건 분석<br/>state.user_profile 저장"]
+    Route{"route_by_completeness<br/>user_profile.isSufficient == true?"}
+    Build["build_query<br/>preferences + user_profile 기반<br/>Pathsdog 검색 파라미터 생성<br/>state.search_query 저장"]
+    Search["search_jobs<br/>Pathsdog MCP 검색<br/>state.candidate_jobs 저장"]
+    Score{"score_jobs<br/>candidate_jobs 존재?"}
+    ScoreLLM["Upstage LLM 적합도 평가<br/>JSON schema로 jobs 배열 강제<br/>state.scored_jobs 저장"]
+    ScoreEmpty["state.scored_jobs = []"]
+    Format["format_response<br/>0.7 이상 우선 정렬<br/>부족하면 낮은 점수 후보 보충<br/>최대 5개 JobData 변환<br/>state.response_jobs 저장"]
+    End([END<br/>response_jobs 반환])
+
+    Start --> Analyze
+    Analyze --> Route
+    Route -->|"YES"| Build
+    Route -->|"NO<br/>정보 부족"| Format
+    Build --> Search
+    Search --> Score
+    Score -->|"YES"| ScoreLLM
+    Score -->|"NO<br/>검색 결과 없음"| ScoreEmpty
+    ScoreLLM --> Format
+    ScoreEmpty --> Format
+    Format --> End
+```
+
+`GraphState`에 누적되는 주요 키는 아래 순서로 채워집니다.
+
+```text
+request
+  -> user_profile
+  -> search_query
+  -> candidate_jobs
+  -> scored_jobs
+  -> response_jobs
+```
+
 ## 요청 형식
 
 Endpoint:
