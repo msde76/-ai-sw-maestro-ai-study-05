@@ -196,7 +196,7 @@ Response:
     "compensation": "원문 확인 필요",
     "deadline": "상시채용",
     "originalLink": "https://toss.im/career/job-detail?job_id=4773428003",
-    "jobIntroduction": "현재 누적 다운로드 200만 건, 앱스토어 평점 4.9를 유지하고 있으며 누적 투자 100억원을 기록했습니다. / 김캐디 팀이 다루는 서비스 전 분야의 백엔드 시스템을 설계하고 개발합니다. / 도메인의 경계 없이 전체 비즈니스 로직을 깊이 있게 이해하고 개선해 나갑니다.",
+    "jobIntroduction": "토스 제품 조직의 서버 개발자는 사용자 경험을 안정적으로 뒷받침하는 제품 서버를 설계하고 운영합니다. 제품 요구사항을 기술적 해법으로 전환하고, 결제·금융 도메인의 안정성, 확장성, 개발 생산성을 함께 개선합니다.",
     "analysis": {
       "matchReason": "Java, Spring Boot, Backend, JWT, GitHub, CI/CD, 테스트 자동화 등 핵심 기술 스택과 역할이 거의 일치하며, 병역특례 가능",
       "missingPoints": "프로젝트 규모, 팀 인원, 프로젝트 기간, 성능 개선 수치, 테스트 커버리지, 포트폴리오 링크 등은 추가 확인이 필요합니다.",
@@ -211,7 +211,7 @@ Response:
     "compensation": "원문 확인 필요",
     "deadline": "상시채용",
     "originalLink": "https://toss.im/career/job-detail?job_id=4071141003&sub_position_id=4071141003&company=%ED%86%A0%EC%8A%A4",
-    "jobIntroduction": "Java, Spring Boot, Backend, JWT, GitHub, CI/CD, 테스트 자동화 등 핵심 기술 스택과 역할이 일치합니다.",
+    "jobIntroduction": "토스의 Product Server Developer는 제품 문제를 빠르게 발견하고 서버 시스템으로 해결합니다. 서비스 성장에 필요한 API, 데이터 흐름, 운영 자동화를 설계하며 여러 직군과 협업해 제품 품질을 높입니다.",
     "analysis": {
       "matchReason": "Java, Spring Boot, Backend, JWT, GitHub, CI/CD, 테스트 자동화 등 핵심 기술 스택과 역할이 일치합니다.",
       "missingPoints": "프로젝트 규모, 팀 인원, 프로젝트 기간, 성능 개선 수치, 테스트 커버리지, 포트폴리오 링크 등은 추가 확인이 필요합니다.",
@@ -226,7 +226,7 @@ Response:
     "compensation": "원문 확인 필요",
     "deadline": "상시채용",
     "originalLink": "https://toss.im/career/job-detail?job_id=4071141003&sub_position_id=6027071003&company=%ED%86%A0%EC%8A%A4%EC%9D%B8%EC%BB%B4",
-    "jobIntroduction": "Java, Spring Boot, Backend, JWT, GitHub, CI/CD, 테스트 자동화 등 핵심 기술 스택과 역할이 일치합니다.",
+    "jobIntroduction": "토스인컴 서버 개발자는 보험과 금융 사용자 경험을 위한 백엔드 시스템을 만듭니다. 제품 요구사항을 안정적인 서버 구조로 구현하고, 운영 환경에서 발생하는 문제를 데이터와 모니터링을 바탕으로 개선합니다.",
     "analysis": {
       "matchReason": "Java, Spring Boot, Backend, JWT, GitHub, CI/CD, 테스트 자동화 등 핵심 기술 스택과 역할이 일치합니다.",
       "missingPoints": "프로젝트 규모, 팀 인원, 프로젝트 기간, 성능 개선 수치, 테스트 커버리지, 포트폴리오 링크 등은 추가 확인이 필요합니다.",
@@ -241,7 +241,7 @@ Response:
     "compensation": "원문 확인 필요",
     "deadline": "상시채용",
     "originalLink": "https://kimcaddie.career.greetinghr.com/ko/o/206177",
-    "jobIntroduction": "Java, Spring Boot, Spring, JPA, MySQL, Redis, Docker, AWS, Nginx, GitHub 등 핵심 기술 스택과 역할이 일치하며, 병역특례 가능",
+    "jobIntroduction": "회사 소개 및 포지션 상세\n\n- 김캐디는 골프를 더 쉽고 편리하게 즐길 수 있도록 돕는 골프 플랫폼입니다.\n- 김캐디 팀은 골퍼와 매장을 운영하는 사장님들이 겪는 문제를 기술로 해결합니다.\n\n주요업무\n\n김캐디 팀이 다루는 서비스 전 분야의 백엔드 시스템을 설계하고 개발합니다. 도메인의 경계 없이 전체 비즈니스 로직을 깊이 있게 이해하고 개선해 나갑니다.",
     "analysis": {
       "matchReason": "Java, Spring Boot, Spring, JPA, MySQL, Redis, Docker, AWS, Nginx, GitHub 등 핵심 기술 스택과 역할이 일치하며, 병역특례 가능",
       "missingPoints": "프로젝트 규모, 팀 인원, 프로젝트 기간, 성능 개선 수치, 테스트 커버리지, 포트폴리오 링크 등은 추가 확인이 필요합니다.",
@@ -256,7 +256,7 @@ Response:
     "compensation": "원문 확인 필요",
     "deadline": "상시채용",
     "originalLink": "https://careers.hybecorp.com/ko/o/210534",
-    "jobIntroduction": "Java, Spring, Backend, Redis, Kafka 등 핵심 기술 스택과 역할이 일치하며, 판교 근무 가능",
+    "jobIntroduction": "Weverse Company의 Back-end 포지션은 글로벌 팬덤 플랫폼의 대규모 트래픽과 다양한 서비스 요구사항을 안정적으로 처리하는 서버 시스템을 개발합니다. 제품 조직과 협업해 사용자 경험을 개선하고, 운영 안정성과 확장성을 높이는 업무를 수행합니다.",
     "analysis": {
       "matchReason": "Java, Spring, Backend, Redis, Kafka 등 핵심 기술 스택과 역할이 일치하며, 판교 근무 가능",
       "missingPoints": "프로젝트 규모, 팀 인원, 프로젝트 기간, 성능 개선 수치, 테스트 커버리지, 포트폴리오 링크 등은 추가 확인이 필요합니다.",

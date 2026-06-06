@@ -30,6 +30,17 @@ def test_extract_job_introduction_falls_back_to_summary_section():
     assert extract_job_introduction(detail_text) == "요약 소개입니다."
 
 
+def test_extract_job_introduction_falls_back_to_summary_when_detail_section_is_empty():
+    detail_text = """[상세 내용]
+
+[요약]
+요약 소개입니다.
+원본:
+원문 링크"""
+
+    assert extract_job_introduction(detail_text) == "요약 소개입니다."
+
+
 def test_extract_job_introduction_returns_empty_string_for_unknown_text():
     assert extract_job_introduction("설명 없음") == ""
 

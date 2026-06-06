@@ -19,14 +19,19 @@ def extract_job_introduction(detail_text: str) -> str:
     if not detail_text:
         return ""
 
-    section_match = re.search(r"\[상세 내용\]", detail_text)
-    if not section_match:
-        section_match = re.search(r"\[요약\]", detail_text)
+    detail = _extract_section(detail_text, "상세 내용")
+    if detail:
+        return detail
+    return _extract_section(detail_text, "요약")
+
+
+def _extract_section(text: str, title: str) -> str:
+    section_match = re.search(rf"\[{re.escape(title)}\]", text)
     if not section_match:
         return ""
 
     start = section_match.end()
-    remainder = detail_text[start:]
+    remainder = text[start:]
     stop_positions = []
 
     original_match = re.search(r"\n원본:", remainder)
