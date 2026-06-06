@@ -25,6 +25,7 @@ class JobData(BaseModel):
     jobId: str
     companyName: str
     jobTitle: str
+    jobIntroduction: str
     suitabilityScore: float = Field(ge=0.0, le=1.0)
     compensation: str
     deadline: str

@@ -1,6 +1,6 @@
 import pytest
 
-from app.graph.nodes.format_response import format_response
+from app.graph.nodes.format_response import format_response, select_response_jobs
 from app.graph.nodes.score_jobs import score_jobs
 
 
@@ -219,6 +219,23 @@ def test_format_response_prioritizes_threshold_and_backfills_to_five():
     assert jobs[0].compensation == "원문 확인 필요"
 
 
+def test_select_response_jobs_prioritizes_threshold_and_backfills_to_five():
+    raw_jobs = [
+        {"jobId": "1", "suitabilityScore": 0.95},
+        {"jobId": "2", "suitabilityScore": 0.0},
+        {"jobId": "3", "suitabilityScore": 0.68},
+        {"jobId": "4", "suitabilityScore": 0.91},
+        {"jobId": "5", "suitabilityScore": 0.8},
+        {"jobId": "6", "suitabilityScore": 0.69},
+        "ignore-me",
+        {"jobId": "7", "suitabilityScore": 0.4},
+    ]
+
+    selected = select_response_jobs(raw_jobs)
+
+    assert [job["jobId"] for job in selected] == ["1", "4", "5", "6", "3"]
+
+
 def test_format_response_clamps_out_of_range_score_before_formatting():
     result = format_response(
         {
@@ -285,3 +302,31 @@ def test_format_response_uses_fallback_defaults_for_missing_analysis():
     assert analysis.matchReason == "추천 이유가 충분히 생성되지 않았습니다."
     assert analysis.missingPoints == "보완점 정보가 충분히 생성되지 않았습니다."
     assert analysis.checkpointGuide == "지원 전 원문 공고를 확인하세요."
+
+
+def test_format_response_includes_job_introduction_from_enriched_jobs():
+    result = format_response(
+        {
+            "scored_jobs": [
+                {
+                    "jobId": "1",
+                    "companyName": "A",
+                    "jobTitle": "백엔드 개발자",
+                    "suitabilityScore": 0.8,
+                    "sourceSnapshot": "검색 스냅샷",
+                }
+            ],
+            "enriched_jobs": [
+                {
+                    "jobId": "1",
+                    "companyName": "A",
+                    "jobTitle": "백엔드 개발자",
+                    "suitabilityScore": 0.8,
+                    "jobIntroduction": "상세 소개입니다.",
+                }
+            ],
+        }
+    )
+
+    job = result["response_jobs"][0]
+    assert job.jobIntroduction == "상세 소개입니다."

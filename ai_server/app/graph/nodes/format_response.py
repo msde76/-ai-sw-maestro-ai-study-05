@@ -25,6 +25,15 @@ def _original_link(raw: dict) -> str | None:
     return value if isinstance(value, str) else None
 
 
+def select_response_jobs(raw_jobs: list[dict]) -> list[dict]:
+    valid_items = [item for item in raw_jobs if isinstance(item, dict)]
+    strong_matches = [item for item in valid_items if _score(item) >= 0.7]
+    backfill_matches = [item for item in valid_items if 0.0 < _score(item) < 0.7]
+    strong_matches.sort(key=_score, reverse=True)
+    backfill_matches.sort(key=_score, reverse=True)
+    return [*strong_matches, *backfill_matches][:5]
+
+
 def _to_job_data(raw: dict) -> JobData:
     analysis = raw.get("analysis") if isinstance(raw.get("analysis"), dict) else {}
     original_link = _original_link(raw)
@@ -32,6 +41,7 @@ def _to_job_data(raw: dict) -> JobData:
         jobId=str(raw.get("jobId") or raw.get("id") or original_link or "unknown"),
         companyName=str(raw.get("companyName") or DEFAULT_TEXT),
         jobTitle=str(raw.get("jobTitle") or DEFAULT_TEXT),
+        jobIntroduction=str(raw.get("jobIntroduction") or raw.get("sourceSnapshot") or DEFAULT_TEXT),
         suitabilityScore=_score(raw),
         compensation=str(raw.get("compensation") or DEFAULT_TEXT),
         deadline=str(raw.get("deadline") or DEFAULT_TEXT),
@@ -45,15 +55,6 @@ def _to_job_data(raw: dict) -> JobData:
 
 
 def format_response(state: GraphState) -> GraphState:
-    scored = state.get("scored_jobs", [])
-    valid_items = [
-        item
-        for item in scored
-        if isinstance(item, dict)
-    ]
-    strong_matches = [item for item in valid_items if _score(item) >= 0.7]
-    backfill_matches = [item for item in valid_items if 0.0 < _score(item) < 0.7]
-    strong_matches.sort(key=_score, reverse=True)
-    backfill_matches.sort(key=_score, reverse=True)
-    selected = [*strong_matches, *backfill_matches][:5]
+    raw_jobs = state.get("enriched_jobs") or state.get("scored_jobs", [])
+    selected = select_response_jobs(raw_jobs)
     return {"response_jobs": [_to_job_data(item) for item in selected]}
