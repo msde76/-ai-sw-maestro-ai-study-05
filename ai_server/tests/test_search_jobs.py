@@ -7,6 +7,7 @@ from app.graph.nodes.build_query import build_query
 from app.graph.nodes.search_jobs import search_jobs
 from app.integrations.pathsdog_mcp import (
     PathsdogMCPError,
+    _content_text,
     _content_to_dict,
     _extract_items_from_payload,
     _extract_payload_from_result,
@@ -222,6 +223,29 @@ def test_content_to_dict_returns_empty_items_for_no_search_results_text():
     )
 
     assert _content_to_dict(result) == {"items": []}
+
+
+def test_content_text_returns_first_text_content():
+    result = SimpleNamespace(
+        isError=False,
+        content=[SimpleNamespace(text="job detail text"), SimpleNamespace(text="ignored")],
+    )
+
+    assert _content_text(result) == "job detail text"
+
+
+def test_content_text_raises_pathsdog_error_for_tool_error():
+    result = SimpleNamespace(isError=True, content=[SimpleNamespace(text="upstream exploded")])
+
+    with pytest.raises(PathsdogMCPError, match="Pathsdog MCP tool returned an error"):
+        _content_text(result)
+
+
+def test_content_text_raises_pathsdog_error_when_text_missing():
+    result = SimpleNamespace(isError=False, content=[SimpleNamespace(text="")])
+
+    with pytest.raises(PathsdogMCPError, match="No text returned by Pathsdog MCP tool"):
+        _content_text(result)
 
 
 def test_parse_search_jobs_text_extracts_job_rows():

@@ -100,6 +100,20 @@ def _extract_payload_from_result(result: Any) -> dict[str, Any]:
     return _content_to_dict(result)
 
 
+def _content_text(result: Any) -> str:
+    if getattr(result, "isError", False):
+        raise PathsdogMCPError("Pathsdog MCP tool returned an error")
+
+    content = getattr(result, "content", None)
+    if content:
+        first = content[0]
+        text = getattr(first, "text", "")
+        if isinstance(text, str) and text:
+            return text
+
+    raise PathsdogMCPError("No text returned by Pathsdog MCP tool")
+
+
 def _extract_items_from_payload(payload: dict[str, Any]) -> list[dict[str, Any]]:
     items = payload.get("jobs") or payload.get("items") or payload.get("results") or []
     if not isinstance(items, list):
@@ -122,3 +136,22 @@ class PathsdogMCPClient:
                 payload = _extract_payload_from_result(result)
 
         return _extract_items_from_payload(payload)
+
+    async def get_job_detail(self, job_id: str | int, *, include_full_description: bool = True) -> str:
+        try:
+            numeric_job_id = int(job_id)
+        except (TypeError, ValueError) as exc:
+            raise PathsdogMCPError(f"Invalid Pathsdog job id: {job_id}") from exc
+
+        async with streamablehttp_client(self._url) as (read_stream, write_stream, _):
+            async with ClientSession(read_stream, write_stream) as session:
+                await session.initialize()
+                result = await session.call_tool(
+                    "get_job_detail",
+                    {
+                        "job_id": numeric_job_id,
+                        "include_full_description": include_full_description,
+                    },
+                )
+
+        return _content_text(result)
