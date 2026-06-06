@@ -1,16 +1,16 @@
-# Full Job Description Design
+# 채용공고 상세 소개 보강 설계
 
-## Goal
+## 목표
 
-Add `jobIntroduction` to the final job recommendation response so the Spring server can receive a human-readable job introduction for each recommended posting.
+최종 추천 채용공고 응답에 `jobIntroduction` 필드를 추가한다. 이 필드는 Spring 서버가 AI 서버의 추천 결과를 받을 때 각 공고의 소개/상세 내용을 함께 표시하기 위한 응답 필드다.
 
-The field should be populated only for the final recommended jobs, up to 5 items. The feature should not fetch full descriptions for every `candidate_jobs` item returned by `search_jobs`.
+`jobIntroduction`은 최종 추천된 공고에만 채운다. 현재 응답 정책상 최종 추천은 최대 5개이므로, Pathsdog MCP 상세 조회도 최대 5개 공고에 대해서만 수행한다. `search_jobs`가 반환한 전체 `candidate_jobs`에 대해 상세 조회를 수행하지 않는다.
 
-## Current State
+## 현재 구조
 
-The FastAPI AI server receives `AnalyzeRequest`, runs a LangGraph workflow, and returns `list[JobData]` from `POST /ai/analyze`.
+FastAPI AI 서버는 `POST /ai/analyze`에서 `AnalyzeRequest`를 받고 LangGraph 워크플로우를 실행한 뒤 `list[JobData]`를 반환한다.
 
-Current workflow:
+현재 워크플로우는 아래 순서다.
 
 ```text
 analyze_user
@@ -20,9 +20,9 @@ analyze_user
   -> format_response
 ```
 
-`search_jobs` calls Pathsdog MCP `search_jobs`. In the observed response, Pathsdog returns raw text in `content[0].text`, not `structuredContent`. The AI server parses that raw text with regex into `candidate_jobs`.
+`search_jobs` 노드는 Pathsdog MCP의 `search_jobs` 도구를 호출한다. 실제 확인 결과, MCP 검색 응답은 `structuredContent`가 아니라 `content[0].text`의 raw text로 내려온다. AI 서버는 이 raw text를 LLM 없이 정규식으로 파싱해서 `candidate_jobs`를 만든다.
 
-The search response includes fields such as:
+검색 결과에서 파싱되는 `candidate_jobs` 예시는 아래와 같다.
 
 ```json
 {
@@ -38,11 +38,13 @@ The search response includes fields such as:
 }
 ```
 
-This is not enough for `jobIntroduction`. Pathsdog MCP `get_job_detail` with `include_full_description=true` returns a raw text detail response containing `[요약]` and `[상세 내용]`. `[상세 내용]` is the best source for `jobIntroduction`; `[요약]` is the fallback.
+이 검색 결과만으로는 `jobIntroduction`을 충분히 채우기 어렵다. 검색 응답의 `sourceSnapshot`은 검색 결과 블록을 보존한 짧은 스냅샷이며, 공고 소개나 상세 본문으로 쓰기에는 부족하다.
 
-## Proposed Architecture
+Pathsdog MCP의 `get_job_detail` 도구를 `include_full_description=true`로 호출하면 raw text 상세 응답에 `[요약]`과 `[상세 내용]` 섹션이 포함된다. `jobIntroduction`에는 `[상세 내용]`을 우선 사용하고, 없으면 `[요약]`을 사용한다.
 
-Add a post-scoring enrichment step:
+## 제안 구조
+
+`score_jobs` 이후, `format_response` 이전에 상세 보강 노드를 추가한다.
 
 ```text
 analyze_user
@@ -53,15 +55,15 @@ analyze_user
   -> format_response
 ```
 
-`enrich_job_details` will:
+`enrich_job_details` 노드는 다음 일을 한다.
 
-1. Read `scored_jobs`.
-2. Select the same final recommendation candidates that `format_response` would return, using a shared helper so ranking rules do not drift:
-   - Include jobs with `suitabilityScore >= 0.7` first.
-   - Backfill with jobs where `0.0 < suitabilityScore < 0.7`.
-   - Sort each group by score descending.
-   - Keep at most 5.
-3. For each selected job, call Pathsdog MCP `get_job_detail` with:
+1. `scored_jobs`를 읽는다.
+2. 최종 응답 대상 공고를 최대 5개까지 선별한다.
+   - `suitabilityScore >= 0.7` 공고를 우선한다.
+   - 5개보다 적으면 `0.0 < suitabilityScore < 0.7` 공고를 점수순으로 보충한다.
+   - 각 그룹은 점수 내림차순으로 정렬한다.
+   - 최대 5개만 유지한다.
+3. 선별된 각 공고의 `jobId`로 Pathsdog MCP `get_job_detail`을 호출한다.
 
 ```json
 {
@@ -70,82 +72,82 @@ analyze_user
 }
 ```
 
-4. Extract `jobIntroduction` from the raw detail text:
-   - Prefer text after `[상세 내용]`.
-   - If `[상세 내용]` is missing or empty, use text after `[요약]`.
-   - If both are missing, fall back to `sourceSnapshot` when available.
-   - If no usable text exists, use `"원문 확인 필요"`.
-5. Store enriched selected jobs in a new state field, `enriched_jobs`.
+4. 상세 raw text에서 `jobIntroduction`을 추출한다.
+   - `[상세 내용]` 섹션을 우선 사용한다.
+   - `[상세 내용]`이 없거나 비어 있으면 `[요약]` 섹션을 사용한다.
+   - 둘 다 없으면 `sourceSnapshot`을 fallback으로 사용한다.
+   - 사용할 수 있는 값이 없으면 `"원문 확인 필요"`를 사용한다.
+5. `jobIntroduction`이 추가된 공고 목록을 `enriched_jobs`에 저장한다.
 
-`format_response` will prefer `enriched_jobs` when present and convert them to `JobData`.
+`format_response`는 `enriched_jobs`가 있으면 이를 우선 사용해 `JobData`로 변환한다.
 
-The existing score filtering and sorting logic should be moved into a small reusable helper, for example `select_response_jobs(raw_jobs)`, used by both `enrich_job_details` and `format_response`.
+점수 필터링과 정렬 규칙은 `enrich_job_details`와 `format_response`에서 중복 구현하지 않는다. 예를 들어 `select_response_jobs(raw_jobs)` 같은 작은 공통 helper를 두고 두 노드가 같은 기준을 사용하도록 한다. 이렇게 해야 최종 추천 선별 기준이 두 곳에서 달라지는 문제를 막을 수 있다.
 
-## DTO Changes
+## DTO 변경
 
-FastAPI `JobData` adds:
+FastAPI 응답 DTO인 `JobData`에 아래 필드를 추가한다.
 
 ```python
 jobIntroduction: str
 ```
 
-Spring `JobResponseDTO.JobDataDTO` adds:
+Spring 서버에서 AI 서버 응답을 역직렬화하는 `JobResponseDTO.JobDataDTO`에도 아래 필드를 추가한다.
 
 ```java
 private String jobIntroduction;
 ```
 
-This is a response field. The existing Spring request DTO (`JobRequestDTO.TaskInfoDTO`) does not need this field because Spring sends the cover letter and preferences to the AI server; the AI server returns `jobIntroduction`.
+이 필드는 Spring이 AI 서버로 보내는 요청 필드가 아니다. Spring 요청 DTO인 `JobRequestDTO.TaskInfoDTO`는 기존처럼 `coverLetter`와 `preferences`를 보낸다. `jobIntroduction`은 AI 서버가 추천 결과를 만들면서 채워서 Spring으로 반환하는 응답 필드다.
 
-If downstream naming calls the object received from FastAPI a "request DTO" from Spring's perspective, the concrete code change is still the same: add the field to the DTO class that deserializes AI server job recommendation results.
+만약 downstream 코드에서 "Spring에서 받는 요청 DTO"라는 표현을 쓰더라도, 실제 코드 변경 대상은 AI 서버 응답을 받는 DTO인 `JobResponseDTO.JobDataDTO`다.
 
-## MCP Client Changes
+## MCP 클라이언트 변경
 
-Extend `PathsdogMCPClient` with:
+`PathsdogMCPClient`에 상세 조회 메서드를 추가한다.
 
 ```python
 async def get_job_detail(self, job_id: str | int, *, include_full_description: bool = True) -> str:
     ...
 ```
 
-The method should:
+메서드 책임은 아래와 같다.
 
-1. Open a streamable HTTP MCP session.
-2. Select or call the `get_job_detail` tool.
-3. Pass numeric `job_id` and `include_full_description`.
-4. Return the raw text from `content[0].text`.
-5. Raise `PathsdogMCPError` if the tool reports `isError` or returns no consumable text.
+1. streamable HTTP MCP 세션을 연다.
+2. `get_job_detail` 도구를 호출한다.
+3. `job_id`는 숫자로 전달하고, `include_full_description`을 함께 전달한다.
+4. 응답의 `content[0].text` raw text를 반환한다.
+5. MCP 도구가 `isError`를 반환하거나 소비 가능한 text가 없으면 `PathsdogMCPError`를 발생시킨다.
 
-Keep search parsing and detail parsing separate. Search returns `list[dict]`; detail returns raw text that is parsed into a single introduction string.
+검색 파싱과 상세 파싱은 분리한다. 검색은 `list[dict]`를 반환하고, 상세 조회는 raw text를 반환한 뒤 별도 parser가 하나의 `jobIntroduction` 문자열로 바꾼다.
 
-## Detail Parsing
+## 상세 내용 파싱
 
-Create small parser helpers that are easy to test:
+상세 내용 파싱은 LLM을 사용하지 않고 결정적인 문자열 파싱으로 처리한다.
+
+권장 helper 구조:
 
 ```text
 extract_job_introduction(detail_text)
-  -> extract section "[상세 내용]"
-  -> else extract section "[요약]"
-  -> else ""
+  -> "[상세 내용]" 섹션 추출
+  -> 없으면 "[요약]" 섹션 추출
+  -> 없으면 빈 문자열 반환
 ```
 
-Section extraction should stop at the next bracket section such as `[기본 정보]`, `[일정]`, `[혜택/복지]`, `[요약]`, or at `원본:` when appropriate.
+섹션 추출은 다음 섹션 헤더나 `원본:` 앞에서 멈춘다. 예를 들어 `[기본 정보]`, `[일정]`, `[혜택/복지]`, `[요약]`, `[상세 내용]` 같은 bracket 섹션이 다음에 나오면 그 직전까지만 추출한다.
 
-Do not use an LLM for detail parsing. This should be deterministic string parsing.
+## 실패 처리
 
-## Error Handling
+상세 조회 실패 때문에 전체 추천 응답을 실패시키지 않는다.
 
-The recommendation response should not fail just because one detail lookup fails.
+각 최종 추천 공고마다 아래 순서로 처리한다.
 
-For each selected job:
+1. `get_job_detail`이 성공하고 소개문 파싱도 성공하면 해당 값을 `jobIntroduction`으로 사용한다.
+2. 상세 조회 또는 파싱이 실패하면 `sourceSnapshot`이 있을 때 이를 `jobIntroduction`으로 사용한다.
+3. `sourceSnapshot`도 없으면 `"원문 확인 필요"`를 사용한다.
 
-1. If `get_job_detail` succeeds and an introduction is parsed, use it.
-2. If lookup or parsing fails, set `jobIntroduction` from `sourceSnapshot` if present.
-3. If no snapshot exists, set `jobIntroduction` to `"원문 확인 필요"`.
+기존의 사용자 분석, 검색, 점수화 단계 실패 정책은 변경하지 않는다.
 
-Existing workflow-level failures for user analysis, search, and scoring remain unchanged.
-
-## Data Flow
+## 데이터 흐름
 
 ```text
 search_jobs
@@ -155,16 +157,16 @@ score_jobs
   -> scored_jobs: list[dict]
 
 enrich_job_details
-  -> selected top max 5 scored jobs
+  -> scored_jobs 중 최종 응답 대상 최대 5개 선별
   -> get_job_detail(jobId, include_full_description=true)
-  -> jobIntroduction added per selected job
+  -> 각 공고에 jobIntroduction 추가
   -> enriched_jobs: list[dict]
 
 format_response
   -> response_jobs: list[JobData]
 ```
 
-Final response example:
+최종 응답 예시는 아래와 같다.
 
 ```json
 [
@@ -186,31 +188,31 @@ Final response example:
 ]
 ```
 
-## Testing Plan
+## 테스트 계획
 
-Add or update FastAPI tests:
+FastAPI 쪽 테스트를 추가하거나 수정한다.
 
-1. `PathsdogMCPClient` detail parser extracts `[상세 내용]`.
-2. Detail parser falls back to `[요약]`.
-3. Detail parser returns empty text when no known section exists.
-4. `enrich_job_details` calls detail lookup only for max 5 final selected jobs.
-5. `enrich_job_details` falls back to `sourceSnapshot` when detail lookup fails.
-6. `format_response` includes `jobIntroduction` in `JobData`.
-7. Contract test confirms `JobData.model_dump()` includes `jobIntroduction`.
-8. Workflow test confirms final response contains `jobIntroduction`.
+1. 상세 parser가 `[상세 내용]` 섹션을 추출하는지 검증한다.
+2. `[상세 내용]`이 없을 때 `[요약]`으로 fallback하는지 검증한다.
+3. 알려진 섹션이 없으면 빈 문자열을 반환하는지 검증한다.
+4. `enrich_job_details`가 최종 응답 대상 최대 5개에 대해서만 상세 조회를 호출하는지 검증한다.
+5. 상세 조회 실패 시 `sourceSnapshot`으로 fallback하는지 검증한다.
+6. `format_response`가 `JobData`에 `jobIntroduction`을 포함하는지 검증한다.
+7. contract test에서 `JobData.model_dump()`에 `jobIntroduction`이 포함되는지 검증한다.
+8. workflow test에서 최종 응답에 `jobIntroduction`이 포함되는지 검증한다.
 
-Add or update Spring tests if existing coverage supports it. At minimum, compile should verify `JobResponseDTO.JobDataDTO` accepts the new field through Jackson/Lombok.
+Spring 쪽은 최소한 컴파일로 `JobResponseDTO.JobDataDTO`가 새 필드를 받을 수 있음을 확인한다. 기존 테스트 구조가 적합하면 Jackson 역직렬화 테스트를 추가한다.
 
-## Non-Goals
+## 범위에서 제외하는 것
 
-- Do not fetch full descriptions for every `candidate_jobs` item.
-- Do not use an LLM to parse Pathsdog detail raw text.
-- Do not change Spring request DTO shape unless a separate UI/API workflow needs to send this field.
-- Do not expose raw `sourceSnapshot` as a public response field.
-- Do not alter the scoring threshold or ranking rules.
+- 전체 `candidate_jobs`에 대해 상세 조회하지 않는다.
+- Pathsdog 상세 raw text 파싱에 LLM을 사용하지 않는다.
+- 별도 요구가 생기기 전까지 Spring 요청 DTO 형태는 변경하지 않는다.
+- raw `sourceSnapshot` 필드를 최종 public 응답 필드로 노출하지 않는다.
+- 기존 점수 threshold나 추천 정렬 규칙을 변경하지 않는다.
 
-## Open Decisions Resolved
+## 확정된 결정사항
 
-- Detail lookup scope: final recommended jobs only, maximum 5.
-- `jobIntroduction` source: prefer `get_job_detail(include_full_description=true)` `[상세 내용]`, then `[요약]`, then `sourceSnapshot`, then `"원문 확인 필요"`.
-- Failure policy: per-job fallback, not whole-request failure.
+- 상세 조회 범위는 최종 추천 공고 최대 5개로 제한한다.
+- `jobIntroduction`은 `[상세 내용]`, `[요약]`, `sourceSnapshot`, `"원문 확인 필요"` 순서로 채운다.
+- 상세 조회 실패는 공고별 fallback으로 처리하며, 전체 요청 실패로 만들지 않는다.
