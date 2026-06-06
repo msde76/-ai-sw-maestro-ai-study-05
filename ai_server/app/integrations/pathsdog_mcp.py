@@ -13,7 +13,7 @@ class PathsdogMCPError(Exception):
 def select_tool_name(tool_names: list[str], required_terms: list[str]) -> str:
     lowered_terms = [term.lower() for term in required_terms]
     names_by_lower = {name.lower(): name for name in tool_names}
-    known_exact_names = ["search_jobs"]
+    known_exact_names = ["search_jobs", "get_job_detail"]
     for known_name in known_exact_names:
         if known_name in names_by_lower and all(term in known_name for term in lowered_terms):
             return names_by_lower[known_name]
@@ -106,10 +106,10 @@ def _content_text(result: Any) -> str:
 
     content = getattr(result, "content", None)
     if content:
-        first = content[0]
-        text = getattr(first, "text", "")
-        if isinstance(text, str) and text:
-            return text
+        for item in content:
+            text = getattr(item, "text", "")
+            if isinstance(text, str) and text:
+                return text
 
     raise PathsdogMCPError("No text returned by Pathsdog MCP tool")
 
@@ -146,8 +146,11 @@ class PathsdogMCPClient:
         async with streamablehttp_client(self._url) as (read_stream, write_stream, _):
             async with ClientSession(read_stream, write_stream) as session:
                 await session.initialize()
+                tools = await session.list_tools()
+                tool_names = [tool.name for tool in tools.tools]
+                detail_tool = select_tool_name(tool_names, ["job", "detail"])
                 result = await session.call_tool(
-                    "get_job_detail",
+                    detail_tool,
                     {
                         "job_id": numeric_job_id,
                         "include_full_description": include_full_description,
