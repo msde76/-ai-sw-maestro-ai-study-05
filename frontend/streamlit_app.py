@@ -489,7 +489,7 @@ def render_preference_pills(job_role: str, experience_levels: list[str], region:
 def render_job_card(job: dict[str, Any], rank: int) -> None:
     analysis = job.get("analysis") or {}
     score_text = format_score(job.get("suitabilityScore"))
-    source_snapshot = job.get("sourceSnapshot", "공고 요약 정보가 없습니다.")
+    job_introduction = job.get("jobIntroduction")
 
     st.markdown(
         f"""
@@ -520,8 +520,9 @@ def render_job_card(job: dict[str, Any], rank: int) -> None:
         unsafe_allow_html=True,
     )
 
-    with st.expander("공고 요약 보기"):
-        st.write(source_snapshot)
+    if job_introduction:
+        with st.expander("공고 요약 보기"):
+            st.write(job_introduction)
 
     if job.get("originalLink"):
         st.link_button("원문 공고 열기", job["originalLink"], use_container_width=True)
