@@ -56,7 +56,8 @@ def _to_job_data(raw: dict) -> JobData:
 
 def format_response(state: GraphState) -> GraphState:
     if "enriched_jobs" in state:
-        selected = state.get("enriched_jobs", [])
+        enriched_jobs = state.get("enriched_jobs", [])
+        selected = [] if enriched_jobs == [] else select_response_jobs(enriched_jobs)
     else:
         selected = select_response_jobs(state.get("scored_jobs", []))
     return {"response_jobs": [_to_job_data(item) for item in selected]}

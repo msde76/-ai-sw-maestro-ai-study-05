@@ -341,3 +341,23 @@ def test_format_response_prefers_empty_enriched_jobs_over_scored_jobs():
     )
 
     assert result == {"response_jobs": []}
+
+
+def test_format_response_caps_and_orders_non_empty_enriched_jobs():
+    result = format_response(
+        {
+            "enriched_jobs": [
+                {"jobId": "1", "suitabilityScore": 0.68},
+                {"jobId": "2", "suitabilityScore": 0.95},
+                {"jobId": "3", "suitabilityScore": 0.4},
+                {"jobId": "4", "suitabilityScore": 0.8},
+                {"jobId": "5", "suitabilityScore": 0.91},
+                {"jobId": "6", "suitabilityScore": 0.69},
+            ]
+        }
+    )
+
+    jobs = result["response_jobs"]
+    assert len(jobs) == 5
+    assert [job.jobId for job in jobs] == ["2", "5", "4", "6", "1"]
+    assert [job.suitabilityScore for job in jobs] == [0.95, 0.91, 0.8, 0.69, 0.68]
