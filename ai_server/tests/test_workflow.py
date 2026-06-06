@@ -41,6 +41,9 @@ class FakeLLM:
 
 
 class FakeSearchClient:
+    def __init__(self):
+        self.detail_calls = []
+
     async def search_jobs(self, query):
         return [
             {
@@ -51,6 +54,10 @@ class FakeSearchClient:
                 "originalLink": "https://example.com/jobs/1",
             }
         ]
+
+    async def get_job_detail(self, job_id, include_full_description=True):
+        self.detail_calls.append((job_id, include_full_description))
+        return "[상세 내용] 테스트컴퍼니 백엔드 포지션 상세 소개입니다."
 
 
 class InsufficientInfoLLM:
@@ -73,10 +80,15 @@ class InsufficientInfoLLM:
 class TrackingSearchClient:
     def __init__(self):
         self.calls = 0
+        self.detail_calls = []
 
     async def search_jobs(self, query):
         self.calls += 1
         return []
+
+    async def get_job_detail(self, job_id, include_full_description=True):
+        self.detail_calls.append((job_id, include_full_description))
+        return ""
 
 
 @pytest.mark.asyncio
@@ -85,13 +97,16 @@ async def test_workflow_returns_scored_jobs():
         coverLetter="Spring Boot 예약 API를 만들고 Redis 캐시로 성능을 개선했습니다.",
         preferences=Preferences(jobRole="백엔드 개발자", techStack=["Spring", "Redis"], region="서울"),
     )
-    workflow = build_workflow(FakeLLM(), FakeSearchClient())
+    search_client = FakeSearchClient()
+    workflow = build_workflow(FakeLLM(), search_client)
 
     jobs = await run_workflow(workflow, request)
 
     assert len(jobs) == 1
     assert jobs[0].jobId == "1"
     assert jobs[0].suitabilityScore == 0.8
+    assert jobs[0].jobIntroduction == "테스트컴퍼니 백엔드 포지션 상세 소개입니다."
+    assert search_client.detail_calls == [("1", True)]
 
 
 @pytest.mark.asyncio
@@ -116,3 +131,4 @@ async def test_workflow_returns_empty_without_search_when_profile_is_insufficien
     assert jobs == []
     assert llm.calls == 1
     assert search_client.calls == 0
+    assert search_client.detail_calls == []
