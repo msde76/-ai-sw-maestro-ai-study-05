@@ -25,6 +25,7 @@ ai_server/
 │   │       ├── build_query.py      # Pathsdog 검색 파라미터 생성
 │   │       ├── search_jobs.py      # 채용공고 검색
 │   │       ├── score_jobs.py       # 공고 적합도 평가
+│   │       ├── enrich_job_details.py # 공고 상세 본문 보강
 │   │       └── format_response.py  # 최종 응답 포맷팅
 │   ├── integrations/
 │   │   └── pathsdog_mcp.py         # Pathsdog MCP 연동
@@ -46,7 +47,8 @@ flowchart LR
     Check -->|"YES"| Query["build_query"]
     Query -->|"search_query"| Pathsdog["Pathsdog MCP"]
     Pathsdog -->|"candidate_jobs[]"| Score["score_jobs\nUpstage LLM"]
-    Score --> Format["format_response\n0.7 이상 우선\n부족하면 낮은 점수 후보 보충\n최대 5개"]
+    Score --> Enrich["enrich_job_details\n상위 5개 상세 조회"]
+    Enrich --> Format["format_response\n0.7 이상 우선\n부족하면 낮은 점수 후보 보충\n최대 5개"]
     Format -->|"JobData[]"| Spring
     Empty -->|"JobData[]"| Spring
 ```
@@ -67,6 +69,7 @@ flowchart TD
     Score{"score_jobs<br/>candidate_jobs 존재?"}
     ScoreLLM["Upstage LLM 적합도 평가<br/>JSON schema로 jobs 배열 강제<br/>state.scored_jobs 저장"]
     ScoreEmpty["state.scored_jobs = []"]
+    Enrich["enrich_job_details<br/>상위 5개 상세 조회<br/>state.enriched_jobs 저장"]
     Format["format_response<br/>0.7 이상 우선 정렬<br/>부족하면 낮은 점수 후보 보충<br/>최대 5개 JobData 변환<br/>state.response_jobs 저장"]
     End([END<br/>response_jobs 반환])
 
@@ -78,8 +81,9 @@ flowchart TD
     Search --> Score
     Score -->|"YES"| ScoreLLM
     Score -->|"NO<br/>검색 결과 없음"| ScoreEmpty
-    ScoreLLM --> Format
-    ScoreEmpty --> Format
+    ScoreLLM --> Enrich
+    ScoreEmpty --> Enrich
+    Enrich --> Format
     Format --> End
 ```
 
@@ -91,6 +95,7 @@ request
   -> search_query
   -> candidate_jobs
   -> scored_jobs
+  -> enriched_jobs
   -> response_jobs
 ```
 
@@ -133,7 +138,7 @@ Body:
     "compensation": "원문 확인 필요",
     "deadline": "상시채용",
     "originalLink": "https://kimcaddie.career.greetinghr.com/ko/o/206177",
-    "jobIntroduction": "[요약] ...\n[상세 내용] ...",
+    "jobIntroduction": "회사 소개 및 포지션 상세",
     "analysis": {
       "matchReason": "Java, Spring Boot, JPA, MySQL, Redis, Docker, AWS 등 핵심 기술 스택이 공고와 잘 맞습니다.",
       "missingPoints": "실제 운영 환경에서의 장애 대응 경험과 구체적인 성능 개선 수치는 추가 확인이 필요합니다.",
@@ -191,7 +196,7 @@ Response:
     "compensation": "원문 확인 필요",
     "deadline": "상시채용",
     "originalLink": "https://toss.im/career/job-detail?job_id=4773428003",
-    "jobIntroduction": "[요약] ...\n[상세 내용] ...",
+    "jobIntroduction": "현재 누적 다운로드 200만 건, 앱스토어 평점 4.9를 유지하고 있으며 누적 투자 100억원을 기록했습니다. / 김캐디 팀이 다루는 서비스 전 분야의 백엔드 시스템을 설계하고 개발합니다. / 도메인의 경계 없이 전체 비즈니스 로직을 깊이 있게 이해하고 개선해 나갑니다.",
     "analysis": {
       "matchReason": "Java, Spring Boot, Backend, JWT, GitHub, CI/CD, 테스트 자동화 등 핵심 기술 스택과 역할이 거의 일치하며, 병역특례 가능",
       "missingPoints": "프로젝트 규모, 팀 인원, 프로젝트 기간, 성능 개선 수치, 테스트 커버리지, 포트폴리오 링크 등은 추가 확인이 필요합니다.",
@@ -206,7 +211,7 @@ Response:
     "compensation": "원문 확인 필요",
     "deadline": "상시채용",
     "originalLink": "https://toss.im/career/job-detail?job_id=4071141003&sub_position_id=4071141003&company=%ED%86%A0%EC%8A%A4",
-    "jobIntroduction": "[요약] ...\n[상세 내용] ...",
+    "jobIntroduction": "Java, Spring Boot, Backend, JWT, GitHub, CI/CD, 테스트 자동화 등 핵심 기술 스택과 역할이 일치합니다.",
     "analysis": {
       "matchReason": "Java, Spring Boot, Backend, JWT, GitHub, CI/CD, 테스트 자동화 등 핵심 기술 스택과 역할이 일치합니다.",
       "missingPoints": "프로젝트 규모, 팀 인원, 프로젝트 기간, 성능 개선 수치, 테스트 커버리지, 포트폴리오 링크 등은 추가 확인이 필요합니다.",
@@ -221,7 +226,7 @@ Response:
     "compensation": "원문 확인 필요",
     "deadline": "상시채용",
     "originalLink": "https://toss.im/career/job-detail?job_id=4071141003&sub_position_id=6027071003&company=%ED%86%A0%EC%8A%A4%EC%9D%B8%EC%BB%B4",
-    "jobIntroduction": "[요약] ...\n[상세 내용] ...",
+    "jobIntroduction": "Java, Spring Boot, Backend, JWT, GitHub, CI/CD, 테스트 자동화 등 핵심 기술 스택과 역할이 일치합니다.",
     "analysis": {
       "matchReason": "Java, Spring Boot, Backend, JWT, GitHub, CI/CD, 테스트 자동화 등 핵심 기술 스택과 역할이 일치합니다.",
       "missingPoints": "프로젝트 규모, 팀 인원, 프로젝트 기간, 성능 개선 수치, 테스트 커버리지, 포트폴리오 링크 등은 추가 확인이 필요합니다.",
@@ -236,7 +241,7 @@ Response:
     "compensation": "원문 확인 필요",
     "deadline": "상시채용",
     "originalLink": "https://kimcaddie.career.greetinghr.com/ko/o/206177",
-    "jobIntroduction": "[요약] ...\n[상세 내용] ...",
+    "jobIntroduction": "Java, Spring Boot, Spring, JPA, MySQL, Redis, Docker, AWS, Nginx, GitHub 등 핵심 기술 스택과 역할이 일치하며, 병역특례 가능",
     "analysis": {
       "matchReason": "Java, Spring Boot, Spring, JPA, MySQL, Redis, Docker, AWS, Nginx, GitHub 등 핵심 기술 스택과 역할이 일치하며, 병역특례 가능",
       "missingPoints": "프로젝트 규모, 팀 인원, 프로젝트 기간, 성능 개선 수치, 테스트 커버리지, 포트폴리오 링크 등은 추가 확인이 필요합니다.",
@@ -251,7 +256,7 @@ Response:
     "compensation": "원문 확인 필요",
     "deadline": "상시채용",
     "originalLink": "https://careers.hybecorp.com/ko/o/210534",
-    "jobIntroduction": "[요약] ...\n[상세 내용] ...",
+    "jobIntroduction": "Java, Spring, Backend, Redis, Kafka 등 핵심 기술 스택과 역할이 일치하며, 판교 근무 가능",
     "analysis": {
       "matchReason": "Java, Spring, Backend, Redis, Kafka 등 핵심 기술 스택과 역할이 일치하며, 판교 근무 가능",
       "missingPoints": "프로젝트 규모, 팀 인원, 프로젝트 기간, 성능 개선 수치, 테스트 커버리지, 포트폴리오 링크 등은 추가 확인이 필요합니다.",
@@ -314,7 +319,7 @@ Response:
 
 `search_jobs` raw text에는 `jobIntroduction`에 바로 넣을 만한 긴 공고 소개나 본문 필드는 없습니다. 검색 응답에서 쓸 수 있는 후보는 `sourceSnapshot`뿐인데, 이 값은 검색 결과 한 블록을 보존한 짧은 스냅샷이라 공고 소개문으로 쓰기에는 부족합니다.
 
-현재 구현된 보강 흐름은 `score_jobs -> final max 5 선택 -> get_job_detail(include_full_description=true) -> [상세 내용] -> [요약] -> sourceSnapshot -> JobData.jobIntroduction` 순서입니다. `score_jobs`로 고른 최종 후보에 대해서만 상세 조회를 수행하고, 응답 포맷 단계에서 `jobIntroduction`을 채웁니다. MCP 도구 스키마는 아래와 같습니다.
+현재 구현된 보강 흐름은 `score_jobs -> enrich_job_details -> format_response`입니다. `score_jobs`로 고른 최종 후보에 대해서만 `get_job_detail(include_full_description=true)`를 호출하고, `jobIntroduction`은 `[상세 내용]` 본문이 있으면 그 본문을, 없으면 `[요약]` 본문을, 그것도 없으면 `sourceSnapshot`을, 마지막으로 `원문 확인 필요`를 사용합니다. MCP 도구 스키마는 아래와 같습니다.
 
 ```json
 {
@@ -323,7 +328,7 @@ Response:
 }
 ```
 
-`include_full_description=false` 또는 생략 시에도 `[요약]` 섹션은 내려오지만, 원문 전체 내용은 제외됩니다. `include_full_description=true`로 호출하면 raw text에 `[상세 내용]` 섹션이 추가되고, 이 섹션과 `[요약]`을 함께 정리해 `jobIntroduction`을 만듭니다.
+`include_full_description=false` 또는 생략 시에도 `[요약]` 섹션은 내려오지만, 원문 전체 내용은 제외됩니다. `include_full_description=true`로 호출하면 raw text에 `[상세 내용]` 섹션이 추가되고, `jobIntroduction`은 이 섹션의 본문을 우선 사용합니다.
 
 예시:
 
