@@ -103,6 +103,20 @@ async def test_enrich_job_details_falls_back_to_source_snapshot_when_detail_fail
 
 
 @pytest.mark.asyncio
+async def test_enrich_job_details_falls_back_to_source_snapshot_when_detail_has_unknown_sections():
+    state = {
+        "scored_jobs": [
+            {"jobId": "1", "suitabilityScore": 0.95, "sourceSnapshot": "검색 스냅샷"},
+        ]
+    }
+    client = FakeDetailClient({"1": "성공했지만 알려진 섹션이 없습니다"})
+
+    result = await enrich_job_details(state, client)
+
+    assert result["enriched_jobs"][0]["jobIntroduction"] == "검색 스냅샷"
+
+
+@pytest.mark.asyncio
 async def test_enrich_job_details_falls_back_to_default_without_snapshot():
     state = {
         "scored_jobs": [

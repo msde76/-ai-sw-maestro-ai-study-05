@@ -1,3 +1,4 @@
+import logging
 import re
 from typing import Any, Protocol
 
@@ -6,6 +7,7 @@ from app.graph.state import GraphState
 
 
 DEFAULT_JOB_INTRODUCTION = "원문 확인 필요"
+logger = logging.getLogger(__name__)
 
 
 class JobDetailClient(Protocol):
@@ -50,7 +52,12 @@ async def enrich_job_details(state: GraphState, client: JobDetailClient) -> Grap
         try:
             detail_text = await client.get_job_detail(job["jobId"], include_full_description=True)
             introduction = extract_job_introduction(detail_text)
-        except Exception:
+        except Exception as exc:
+            logger.warning(
+                "Failed to enrich Pathsdog job detail for jobId=%s",
+                job.get("jobId"),
+                exc_info=True,
+            )
             introduction = ""
 
         if not introduction:
