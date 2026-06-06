@@ -37,6 +37,7 @@ public class JobResponseDTO {
         private String jobId;
         private String companyName;
         private String jobTitle;
+        private String jobIntroduction;
         private Double suitabilityScore;
         private String compensation;
         private String deadline;
