@@ -330,3 +330,14 @@ def test_format_response_includes_job_introduction_from_enriched_jobs():
 
     job = result["response_jobs"][0]
     assert job.jobIntroduction == "상세 소개입니다."
+
+
+def test_format_response_prefers_empty_enriched_jobs_over_scored_jobs():
+    result = format_response(
+        {
+            "enriched_jobs": [],
+            "scored_jobs": [{"jobId": "1", "suitabilityScore": 0.8}],
+        }
+    )
+
+    assert result == {"response_jobs": []}
