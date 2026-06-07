@@ -7,6 +7,7 @@ from app.graph.nodes.build_query import build_query
 from app.graph.nodes.search_jobs import search_jobs
 from app.integrations.pathsdog_mcp import (
     PathsdogMCPError,
+    _content_text,
     _content_to_dict,
     _extract_items_from_payload,
     _extract_payload_from_result,
@@ -224,6 +225,43 @@ def test_content_to_dict_returns_empty_items_for_no_search_results_text():
     assert _content_to_dict(result) == {"items": []}
 
 
+def test_content_text_returns_first_text_content():
+    result = SimpleNamespace(
+        isError=False,
+        content=[SimpleNamespace(text="job detail text"), SimpleNamespace(text="ignored")],
+    )
+
+    assert _content_text(result) == "job detail text"
+
+
+def test_content_text_skips_empty_and_non_text_items_before_returning_later_text():
+    result = SimpleNamespace(
+        isError=False,
+        content=[
+            SimpleNamespace(text=""),
+            SimpleNamespace(),
+            SimpleNamespace(text=None),
+            SimpleNamespace(text="detail text"),
+        ],
+    )
+
+    assert _content_text(result) == "detail text"
+
+
+def test_content_text_raises_pathsdog_error_for_tool_error():
+    result = SimpleNamespace(isError=True, content=[SimpleNamespace(text="upstream exploded")])
+
+    with pytest.raises(PathsdogMCPError, match="Pathsdog MCP tool returned an error"):
+        _content_text(result)
+
+
+def test_content_text_raises_pathsdog_error_when_text_missing():
+    result = SimpleNamespace(isError=False, content=[SimpleNamespace(text="")])
+
+    with pytest.raises(PathsdogMCPError, match="No text returned by Pathsdog MCP tool"):
+        _content_text(result)
+
+
 def test_parse_search_jobs_text_extracts_job_rows():
     text = """이번 페이지 2개 채용공고:
 
@@ -262,6 +300,88 @@ def test_extract_payload_from_result_raises_pathsdog_error_for_tool_error():
 
     with pytest.raises(PathsdogMCPError, match="Pathsdog MCP tool returned an error"):
         _extract_payload_from_result(result)
+
+
+class FakeStreamableHTTPClient:
+    def __init__(self, url):
+        self.url = url
+
+    async def __aenter__(self):
+        return ("read-stream", "write-stream", None)
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+
+class FakeClientSession:
+    instances = []
+
+    def __init__(self, read_stream, write_stream):
+        self.read_stream = read_stream
+        self.write_stream = write_stream
+        self.initialized = False
+        self.call_tool_calls = []
+        self.list_tools_calls = 0
+        FakeClientSession.instances.append(self)
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+    async def initialize(self):
+        self.initialized = True
+
+    async def list_tools(self):
+        self.list_tools_calls += 1
+        return SimpleNamespace(
+            tools=[
+                SimpleNamespace(name="search_jobs"),
+                SimpleNamespace(name="job_detail_lookup"),
+            ]
+        )
+
+    async def call_tool(self, tool_name, payload):
+        self.call_tool_calls.append((tool_name, payload))
+        return SimpleNamespace(isError=False, content=[SimpleNamespace(text="detail payload")])
+
+
+@pytest.mark.asyncio
+async def test_get_job_detail_uses_listed_tool_and_passes_payload(monkeypatch):
+    FakeClientSession.instances.clear()
+    monkeypatch.setattr("app.integrations.pathsdog_mcp.streamablehttp_client", FakeStreamableHTTPClient)
+    monkeypatch.setattr("app.integrations.pathsdog_mcp.ClientSession", FakeClientSession)
+
+    from app.integrations.pathsdog_mcp import PathsdogMCPClient
+
+    client = PathsdogMCPClient("http://example.test")
+    result = await client.get_job_detail("42", include_full_description=False)
+
+    assert result == "detail payload"
+    assert len(FakeClientSession.instances) == 1
+    session = FakeClientSession.instances[0]
+    assert session.initialized is True
+    assert session.list_tools_calls == 1
+    assert session.call_tool_calls == [
+        (
+            "job_detail_lookup",
+            {"job_id": 42, "include_full_description": False},
+        )
+    ]
+
+
+@pytest.mark.asyncio
+async def test_get_job_detail_raises_for_invalid_job_id(monkeypatch):
+    monkeypatch.setattr("app.integrations.pathsdog_mcp.streamablehttp_client", FakeStreamableHTTPClient)
+    monkeypatch.setattr("app.integrations.pathsdog_mcp.ClientSession", FakeClientSession)
+
+    from app.integrations.pathsdog_mcp import PathsdogMCPClient
+
+    client = PathsdogMCPClient("http://example.test")
+
+    with pytest.raises(PathsdogMCPError, match="Invalid Pathsdog job id: invalid"):
+        await client.get_job_detail("invalid")
 
 
 class FakePathsdogClient:
